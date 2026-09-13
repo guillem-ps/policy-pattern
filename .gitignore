@@ -12,6 +12,9 @@ index.txt
 ## Agents dirs
 **.claude**
 
+## Python version file:
+.python-version
+
 ################### Folders to exclude ###################
 # all IDE folders
 **vscode**
