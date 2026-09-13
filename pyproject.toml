@@ -1,0 +1,77 @@
+[project]
+name = "policy-pattern"
+version = "0.1.0"
+description = "A minimal, embeddable ReBAC authorization engine for Python, inspired by Google Zanzibar."
+readme = "README.md"
+authors = [
+    { name = "Guillem Pozo Sebastián", email = "58363308+guillem-ps@users.noreply.github.com" }
+]
+license = "Apache-2.0"
+license-files = ["LICENSE.md"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+keywords = [
+    "python",
+    "authorization",
+    "access-control",
+    "rebac",
+    "zanzibar",
+    "security",
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/guillem-ps/policy-pattern"
+Repository = "https://github.com/guillem-ps/policy-pattern"
+Issues = "https://github.com/guillem-ps/policy-pattern/issues"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Flat layout (package at repo root, no src/) to match the reference
+# project's convention — uv_build defaults to expecting src/<module>.
+module-root = "."
+
+[dependency-groups]
+coverage = ["coverage[toml]>=7.0.0"]
+develop = ["pre-commit>=4.0.0"]
+format = ["ruff>=0.16.7"]
+lint = ["ruff>=0.16.7", "ty>=0.0.80", { include-group = "test" }]
+test = ["pytest>=9.1.1", "testcontainers>=4.15.0", { include-group = "coverage" }]
+all = [
+    { include-group = "coverage" },
+    { include-group = "develop" },
+    { include-group = "format" },
+    { include-group = "lint" },
+    { include-group = "test" },
+]
+# uv installs the "dev" group automatically on a bare `uv sync` (no
+# --group flag needed) — alias it to "all" so that convenience survives
+# the split into named groups, since there's no Makefile wrapping it.
+dev = [{ include-group = "all" }]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+addopts = [
+    "--strict-config",  # fail if an unregistered option is used
+    "--strict-markers", # fail if an unregistered marker is used
+    "--color=yes",      # color the output
+]
+markers = [
+    "unit: relation rewrite / evaluator logic, no storage",
+    "contract: shared TupleStore contract, runs against every adapter",
+    "integration: real PostgreSQL via testcontainers",
+]
+xfail_strict = true
