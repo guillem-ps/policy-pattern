@@ -1,0 +1,107 @@
+fail_fast: true
+
+default_language_version:
+  python: python3.14
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # v5.0.0
+    hooks:
+      - id: no-commit-to-branch
+        name: 🚧 Protected Branches Checker
+        args:
+          - --branch=master
+        pass_filenames: false
+        stages:
+          - pre-commit
+
+      - id: check-added-large-files
+        name: 📦 Large Files Checker
+        args:
+          - --maxkb=100
+        stages:
+          - pre-commit
+
+      - id: check-case-conflict
+        name: 🔠 Case Conflict Checker
+        stages:
+          - pre-commit
+
+      - id: check-toml
+        name: 📄 TOML Files Checker
+        files: '.*\.toml'
+        stages:
+          - pre-commit
+
+      - id: check-yaml
+        name: 📄 YAML Files Checker
+        files: '.*\.ya?ml'
+        args:
+          - --unsafe
+        stages:
+          - pre-commit
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # v0.16.7
+    hooks:
+      - id: ruff-format
+        name: 🎨 Formatter
+        stages:
+          - pre-commit
+
+      - id: ruff
+        name: 🧹 Linter
+        args:
+          - --fix
+        stages:
+          - pre-commit
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 7ff8d35ae36a7d2b968f2f90b4c723e292e594ee # v2.3.1
+    hooks:
+      - id: mypy
+        name: 🔎 Type Checker
+        stages:
+          - pre-commit
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 782f3104786efdce0f809bce8a9ff31f2fa1c9ed # v8.27.0
+    hooks:
+      - id: gitleaks
+        name: 🔍 Secrets Checker
+        entry: gitleaks detect --no-git --redact --verbose
+        stages:
+          - pre-commit
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: a0cc4901b0faaced74c713a9e355555fc4de0880 # v4.7.1
+    hooks:
+      - id: commitizen
+        name: 📝 Standard Commit Message Checker
+        stages:
+          - commit-msg
+
+  - repo: local
+    hooks:
+      # Keep requirements.txt / requirements_dev.txt in sync with
+      # uv.lock — pyproject.toml + uv.lock stay the source of truth,
+      # these are generated exports for tools/CI that don't speak uv.
+      # Flags depend on the dependency-group names once pyproject.toml
+      # is filled in; adjust --no-dev / --only-group as needed.
+      - id: uv-export-requirements
+        name: 📌 Sync requirements.txt from uv.lock
+        entry: uv export --no-dev -o requirements.txt
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+        stages:
+          - pre-commit
+
+      - id: uv-export-requirements-dev
+        name: 📌 Sync requirements_dev.txt from uv.lock
+        entry: uv export -o requirements_dev.txt
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+        stages:
+          - pre-commit
