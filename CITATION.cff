@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: policy-pattern
+message: >
+  If you use this software, please cite it using the metadata below.
+type: software
+authors:
+  - given-names: Guillem
+    family-names: Pozo Sebastián
+repository-code: https://github.com/guillem-ps/policy-pattern
+abstract: >
+  policy-pattern is a minimal, embeddable ReBAC (relationship-based
+  access control) engine for Python, in the spirit of Google Zanzibar.
+  It models authorization as a graph of relationships between subjects
+  and objects instead of flat roles, ships as a standalone in-process
+  library with no required server or network dependency, and treats
+  storage semantics as a documented, testable contract shared across
+  adapters.
+keywords:
+  - python
+  - authorization
+  - access-control
+  - rebac
+  - zanzibar
+  - security
+license: Apache-2.0
