@@ -1,0 +1,49 @@
+# Security Policy
+
+## Project status
+
+`policy-pattern` is currently in the design/specification phase —
+there is no released package and no deployed consumer yet. There is no
+CVE surface yet, but this policy applies from the first line of code
+onward, not retroactively.
+
+## Scope
+
+This library sits directly on the authorization decision path, so its
+security bar is higher than a typical dependency. In scope for
+reports: any input that produces an incorrect `check()` result
+(false allow is critical; false deny is a correctness bug but still
+reportable), tuple storage adapters (in-memory and Postgres) leaking
+or corrupting data across namespaces/tenants, and denial-of-service
+vectors in the relation rewrite evaluator (e.g. unbounded recursion
+through tuple-to-userset rules).
+
+Out of scope: authentication logic (login, password handling, session
+management, token issuance) is not part of this library and is not
+covered here — this library only answers "is this action allowed,"
+never "who is this."
+
+## Reporting a vulnerability
+
+Do **not** open a public GitHub issue for security reports, and do not
+publish a proof-of-concept before a fix is available — a bug in this
+library affects every consumer's authorization decisions.
+
+Use [GitHub Security Advisories](https://github.com/guillem-ps/policy-pattern/security/advisories/new)
+for this repository, or email the maintainer directly if advisories
+are unavailable. Include a minimal reproduction (subject/relation/
+object tuples and the rewrite rules involved) where possible.
+
+## Response expectations
+
+This project is independently maintained, without a dedicated support
+contract — there is no SLA. Given the security-sensitive nature of an
+authorization engine, correctness reports are prioritized over feature
+work. Reports get a best-effort acknowledgment and a fix or mitigation
+plan communicated back to the reporter before any public disclosure.
+
+## Supported versions
+
+No versioned releases exist yet. Once the package is published to
+PyPI with semantic versioning, this section will list which lines
+receive security fixes.
