@@ -66,16 +66,16 @@ adapter chooses independently.
 ### Identifier content vs. canonical serialization
 
 **Identifier *content* is not restricted to exclude `:`, `#`, or `@`.**
-A real-world `id` — an email address (`guillem@example.com`), a UUID, a
+A real-world `id` — an email address (`john@example.com`), a UUID, a
 path — may legitimately contain any of these characters, and requiring
 callers to pre-encode such values before they can name a `user` would be
 the library imposing friction that its own structural-equality design was
 supposed to avoid.
 
-The **structured** form (`Object(type="user", id="guillem@example.com")`)
+The **structured** form (`Object(type="user", id="john@example.com")`)
 is authoritative and has no ambiguity — it is Python objects, not a string
 to scan. Ambiguity only appears in the **canonical textual serialization**
-(`user:guillem@example.com` / `document:42#owner@user:guillem`), where
+(`user:john@example.com` / `document:42#owner@user:john`), where
 `:`, `#`, and `@` are structural separators and therefore need an escaping
 or encoding rule when they also appear inside a component's content.
 
@@ -249,7 +249,7 @@ There is deliberately **no subject-keyed query** ("find all tuples for this
 subject") in v1. Forward evaluation never needs it — it always starts from
 the queried object and walks relations outward, never the reverse. A
 subject-keyed query is what reverse lookup / `ListObjects` ("which documents
-can Guillem view?") needs, and that is explicitly out of scope for v1. Don't
+can John view?") needs, and that is explicitly out of scope for v1. Don't
 add it just because it looks symmetric with `(object, relation)` lookup;
 add it only when `ListObjects` is actually being designed.
 
