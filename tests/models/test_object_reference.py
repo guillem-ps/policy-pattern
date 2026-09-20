@@ -54,3 +54,18 @@ def test_object_reference_creates_identifiers() -> None:
     assert mock_identifier.call_count == 2
     mock_identifier.assert_any_call(value="document", field="type")
     mock_identifier.assert_any_call(value="42", field="id")
+
+
+def test_object_reference_inequality_different_type() -> None:
+    """Test that two ObjectReference instances with different type are not equal."""
+    assert ObjectReference(type="document", id="42") != ObjectReference(type="folder", id="42")
+
+
+def test_object_reference_inequality_different_id() -> None:
+    """Test that two ObjectReference instances with different id are not equal."""
+    assert ObjectReference(type="document", id="42") != ObjectReference(type="document", id="43")
+
+
+def test_object_reference_hash_consistency() -> None:
+    """Test that equal ObjectReference instances have the same hash."""
+    assert hash(ObjectReference(type="document", id="42")) == hash(ObjectReference(type="document", id="42"))
