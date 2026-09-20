@@ -21,7 +21,7 @@ class SubjectSet:
     fixed list stored here.
 
     This is the other half of `Subject` (`Subject = DirectSubject |
-    SubjectSet`, not yet implemented): `DirectSubject` names one entity;
+    SubjectSet`): `DirectSubject` names one entity;
     `SubjectSet` names a computation over the graph ("whoever satisfies
     this relation on this object right now"). It is exactly how nested
     groups work in Zanzibar — `group:eng#member@group:backend#member`

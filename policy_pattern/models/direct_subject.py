@@ -27,8 +27,8 @@ class DirectSubject:
     `DirectSubject` is ever constructed — there is nothing left for this
     class to validate on its own.
 
-    This is one half of `Subject` (`Subject = DirectSubject | SubjectSet`,
-    not yet implemented) — the other half, `SubjectSet`, is a genuinely
+    This is one half of `Subject` (`Subject = DirectSubject | SubjectSet`)
+    — the other half, `SubjectSet`, is a genuinely
     different concept: not a single entity, but a reference to *a relation
     on an object* (`group:eng#member`), i.e. a set of subjects rather than
     one.
