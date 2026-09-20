@@ -1,5 +1,5 @@
 """
-Set of errors related with Identifier class.
+Set of errors related to Identifier class.
 """
 
 from .base_error import BaseError

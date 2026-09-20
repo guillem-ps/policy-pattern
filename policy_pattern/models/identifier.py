@@ -1,6 +1,6 @@
 """
 Value Object representing an entity identifier.
--Must be inmutable, hashable, and comparable.
+-Must be immutable, hashable, and comparable.
 -An identifier contains the value that identifies an entity and
 -the field/type associated with that identifier.
 -Example:
