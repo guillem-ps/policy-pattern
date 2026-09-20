@@ -107,6 +107,9 @@ def test_identifier_is_frozen() -> None:
     with raises(FrozenInstanceError):
         identifier.value = "43"  # ty: ignore[invalid-assignment]
 
+    with raises(FrozenInstanceError):
+        identifier.field = "other"  # ty: ignore[invalid-assignment]
+
 
 def test_identifier_allows_colon_hash_at_characters() -> None:
     """Test that ':', '#', and '@' are valid identifier value characters, not restricted."""
