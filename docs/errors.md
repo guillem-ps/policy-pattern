@@ -1,6 +1,6 @@
 # Error codes
 
-Every `policy_pattern` exception is a `PolicyPatternBaseError` shaped after
+Every `policy_pattern` exception is a `BaseError` shaped after
 the [LSP Diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic)
 model — a real, developer-facing standard for reporting errors and
 warnings, adapted for a library instead of an editor/API client.
@@ -23,8 +23,10 @@ caller can match on `err.code` without parsing free text.
 
 Message format: interpolated values in `message`/`related` use Python's
 `!r` conversion (`f"identifier {value!r} is invalid"`), not a custom
-bracket convention — enforced by `scripts/check_error_message_format.py`
-in pre-commit.
+bracket convention — no automated hook enforces this, checked by hand on
+review.*
+
+In the future, it's necessary to automatise as a pre-commit hook, but for now, the human eye is enough.
 
 ## Ranges
 
