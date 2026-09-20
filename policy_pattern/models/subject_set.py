@@ -35,10 +35,9 @@ class SubjectSet:
 
     Example:
         SubjectSet(object=ObjectReference(type="group", id="eng"), relation="member")
-    equals:
-        ObjectReference(type="group", id="eng") -> Identifier(
-            value="group", field="type"
-        ) and Identifier(value="eng", field="id") -> group:eng
+
+    `object` is validated by `ObjectReference` itself; `relation` is
+    validated as an `Identifier` with `field="relation"`.
 
     Raises:
         InvalidIdentifierError: Propagated from `Identifier` if `relation` is invalid,

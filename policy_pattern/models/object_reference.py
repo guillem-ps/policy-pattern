@@ -20,8 +20,9 @@ class ObjectReference:
 
     Example:
         ObjectReference(type="document", id="42")
-    equals:
-        Identifier(value="document", field="type") and Identifier(value="42", field="id")
+
+    Both components are validated as `Identifier` values with fields
+    `"type"` and `"id"`, respectively.
     """
 
     type: str

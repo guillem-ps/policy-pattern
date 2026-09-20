@@ -23,9 +23,9 @@ class Relation:
 
     Example:
         Relation(allowed_subject_types=("user", "organization#member"))
-    equals:
-        Identifier(value="user", field="allowed_subject_types") and
-        Identifier(value="organization#member", field="allowed_subject_types")
+
+    Each allowed subject type is validated as an `Identifier` with
+    `field="allowed_subject_types"`.
     """
 
     allowed_subject_types: tuple[str, ...]
