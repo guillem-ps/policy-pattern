@@ -39,11 +39,17 @@ class Model:
         Validates every Reference/tupleset name and returns an immutable CompiledModel.
 
         Raises:
-            ModelValidationError: If a `Reference`/`tupleset` name doesn't exist
-                on its own type, or a `tupleset` resolves to a permission instead
-                of a relation.
+            ModelValidationError: If a `Type`'s key in `types` doesn't match
+                its own `name`, a `Reference`/`tupleset` name doesn't exist
+                on its own type, or a `tupleset` resolves to a permission
+                instead of a relation.
         """
         for type_name, type_declaration in self.types.items():
+            if type_name != type_declaration.name:
+                raise ModelValidationError(
+                    message=f"model key {type_name!r} does not match Type.name {type_declaration.name!r}",
+                    related=f"type={type_name!r}",
+                )
             for permission_name, expression in type_declaration.permissions.items():
                 self._validate_expression(expression, type_declaration, type_name, permission_name)
 

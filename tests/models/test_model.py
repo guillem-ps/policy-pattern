@@ -79,6 +79,24 @@ def test_model_compile_valid_returns_compiled_model() -> None:
     assert compiled.types["document"] is document
 
 
+def test_model_compile_mismatched_type_name_raises() -> None:
+    """
+    Test that a Type whose `name` disagrees with its key in `types` raises ModelValidationError.
+
+    The dict key is the identifier actually used for lookups
+    (`CompiledModel.types["document"]`) — if `Type.name` disagreed, error
+    messages (keyed by `type_name`) would describe a type that isn't the
+    one being validated.
+    """
+    document = Type(name="folder", relations={}, permissions={})
+    model = Model(types={"document": document})
+
+    with raises(ModelValidationError) as exc_info:
+        model.compile()
+
+    assert exc_info.value.message == "model key 'document' does not match Type.name 'folder'"
+
+
 def test_model_compile_undeclared_reference_raises() -> None:
     """
     Test that a Reference to an undeclared name raises ModelValidationError.
