@@ -24,7 +24,8 @@ class Type:
         Type(name="document")
 
     Raises:
-        InvalidIdentifierError: Propagated from `Identifier` if `name` is invalid.
+        InvalidIdentifierError: Propagated from `Identifier` if `name`, a
+            relation name, or a permission name is invalid.
     """
 
     name: str
@@ -32,10 +33,16 @@ class Type:
     permissions: Mapping[str, PermissionExpression]
 
     _TYPE_NAME_FIELD: ClassVar[str] = "type"
+    _RELATION_NAME_FIELD: ClassVar[str] = "relation"
+    _PERMISSION_NAME_FIELD: ClassVar[str] = "permission"
 
     def __post_init__(self) -> None:
         """
-        Validate `name`, and make `relations`/`permissions` a read-only view.
+        Validate `name` and every relation/permission name, then make the mappings read-only views.
+
+        `relations`/`permissions` keys are the actual schema identifiers —
+        `Reference`/`tupleset` names resolve against them — so they need the
+        same `Identifier` validation as `name` itself, not just the values.
 
         `frozen=True` only blocks reassigning `relations`/`permissions`
         themselves — a plain `dict` field would still be mutable in place
@@ -44,5 +51,9 @@ class Type:
         original dict (once copied) can affect this instance afterward.
         """
         Identifier(value=self.name, field=self._TYPE_NAME_FIELD)
+        for relation_name in self.relations:
+            Identifier(value=relation_name, field=self._RELATION_NAME_FIELD)
+        for permission_name in self.permissions:
+            Identifier(value=permission_name, field=self._PERMISSION_NAME_FIELD)
         object.__setattr__(self, "relations", MappingProxyType(dict(self.relations)))
         object.__setattr__(self, "permissions", MappingProxyType(dict(self.permissions)))

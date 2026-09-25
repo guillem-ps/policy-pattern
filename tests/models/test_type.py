@@ -29,6 +29,22 @@ def test_type_invalid_name() -> None:
         Type(name="", relations={}, permissions={})
 
 
+def test_type_invalid_relation_key_raises() -> None:
+    """
+    Test that an InvalidIdentifierError is raised when a relations key is invalid.
+    """
+    with raises(InvalidIdentifierError):
+        Type(name="document", relations={"": Relation(allowed_subject_types=("user",))}, permissions={})
+
+
+def test_type_invalid_permission_key_raises() -> None:
+    """
+    Test that an InvalidIdentifierError is raised when a permissions key is invalid.
+    """
+    with raises(InvalidIdentifierError):
+        Type(name="document", relations={}, permissions={"": Reference(name="owner")})
+
+
 def test_type_relations_become_read_only_view() -> None:
     """
     Test that `relations` is wrapped in a MappingProxyType, blocking item assignment.
