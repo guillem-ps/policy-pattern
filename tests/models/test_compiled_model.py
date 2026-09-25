@@ -7,7 +7,8 @@ from types import MappingProxyType
 
 from pytest import raises
 
-from policy_pattern.models import CompiledModel, Type
+from policy_pattern.errors import ModelValidationError
+from policy_pattern.models import CompiledModel, Reference, Type
 
 
 def test_compiled_model_valid_construction() -> None:
@@ -17,6 +18,35 @@ def test_compiled_model_valid_construction() -> None:
     document = Type(name="document", relations={}, permissions={})
     compiled = CompiledModel(types={"document": document})
     assert compiled.types["document"] is document
+
+
+def test_compiled_model_direct_construction_validates_undeclared_reference() -> None:
+    """
+    Test that constructing CompiledModel directly (bypassing Model.compile()) still validates.
+
+    `CompiledModel`'s docstring says `Evaluator` trusts it as already
+    validated — without this guard, a caller who skips `Model.compile()`
+    could hand the evaluator an undeclared `Reference` past that trust
+    boundary entirely.
+    """
+    document = Type(name="document", relations={}, permissions={"view": Reference(name="missing")})
+
+    with raises(ModelValidationError) as exc_info:
+        CompiledModel(types={"document": document})
+
+    assert exc_info.value.message == "document.view references undeclared name 'missing'"
+
+
+def test_compiled_model_direct_construction_validates_mismatched_type_name() -> None:
+    """
+    Test that constructing CompiledModel directly still validates the key/name match.
+    """
+    document = Type(name="folder", relations={}, permissions={})
+
+    with raises(ModelValidationError) as exc_info:
+        CompiledModel(types={"document": document})
+
+    assert exc_info.value.message == "model key 'document' does not match Type.name 'folder'"
 
 
 def test_compiled_model_types_become_read_only_view() -> None:
