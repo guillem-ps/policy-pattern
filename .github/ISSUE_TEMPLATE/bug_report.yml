@@ -1,0 +1,31 @@
+name: Bug report
+description: Something in policy-pattern behaves incorrectly
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A small `Model`/tuple set that reproduces the issue, if applicable.
+      render: python
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: policy-pattern version
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+    validations:
+      required: true
