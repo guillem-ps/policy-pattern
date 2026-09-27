@@ -25,6 +25,9 @@ def validate_types(types: Mapping[str, Type]) -> None:
         ModelValidationError: If a `Type`'s key doesn't match its own `name`,
             a `Reference`/`tupleset` name doesn't exist on its own type, or a
             `tupleset` resolves to a permission instead of a relation.
+
+        ModelValidationError: If a permission expression and relation share the same name on the same type,
+        which is illegal.
     """
     for type_name, type_declaration in types.items():
         if type_name != type_declaration.name:
@@ -32,6 +35,12 @@ def validate_types(types: Mapping[str, Type]) -> None:
                 message=f"model key {type_name!r} does not match Type.name {type_declaration.name!r}",
                 related=f"type={type_name!r}",
             )
+        if overlap := sorted(type_declaration.relations.keys() & type_declaration.permissions.keys()):
+            raise ModelValidationError(
+                message=f"{type_name} declares {overlap!r} as both a relation and a permission",
+                related=f"type={type_name!r}",
+            )
+
         for permission_name, expression in type_declaration.permissions.items():
             _validate_expression(expression, type_declaration, type_name, permission_name)
 

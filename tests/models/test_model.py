@@ -227,3 +227,26 @@ def test_model_compile_unknown_expression_type_raises() -> None:
         model.compile()
 
     assert exc_info.value.message == "document.view contains unknown expression type PermissionExpression"
+
+
+def test_model_compile_rejects_name_used_as_both_relation_and_permission() -> None:
+    """
+    Test that a name declared as both a relation and a permission on the same Type raises ModelValidationError.
+
+    `Reference`'s own docstring assumes a name is unambiguously either a
+    relation or a permission ("the evaluator resolves which one it is at
+    evaluation time") — nothing enforced that until now, so this state was
+    silently compilable.
+    """
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"owner": Reference(name="editor"), "editor": Reference(name="owner")},
+    )
+    model = Model(types={"document": document})
+
+    with raises(ModelValidationError) as exc_info:
+        model.compile()
+
+    assert exc_info.value.message == "document declares ['owner'] as both a relation and a permission"
+    assert exc_info.value.related == "type='document'"
