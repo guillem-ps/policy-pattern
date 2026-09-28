@@ -3,7 +3,7 @@ Base class for all policy pattern errors.
 To create a standardized error response, inherit from this class and set the `code` attribute to a unique error code.
 """
 
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 
 class BaseError(Exception):
@@ -14,7 +14,6 @@ class BaseError(Exception):
     """
 
     code: ClassVar[str]
-    severity: ClassVar[Literal["error", "warning"]] = "error"
 
     def __init__(self, *, message: str, related: str | None = None) -> None:
         """
