@@ -75,36 +75,29 @@ This style of authorization is useful for domains involving nested resources, or
 
 ## Example
 
-A conceptual relationship graph might contain:
-
-```text
-folder:engineering#owner@user:7
-
-document:42#parent@folder:engineering
-```
-
-with an authorization model equivalent to:
-
-```text
-document.viewer =
-    document.owner
-    OR
-    document.parent->owner
-```
-
-Then:
-
 ```python
-engine.check(
-    subject="user:7",
-    relation="viewer",
-    object="document:42",
+model = Model()
+model.types["document"] = Type(
+    name="document",
+    relations={
+        "owner": Relation(allowed_subject_types=("user",)),
+        "parent": Relation(allowed_subject_types=("folder",)),
+    },
+    permissions={
+        "viewer": Union(left=Reference(name="owner"), right=TupleToUserset(tupleset="parent", computed="viewer")),
+    },
 )
+compiled = model.compile()
+
+evaluator = Evaluator(model=compiled, store=store)
+evaluator.check(alice, "viewer", document_42)
 ```
 
-would evaluate whether `user:7` belongs to the `viewer` userset for `document:42`.
+`viewer` here means "the document's own owner, or the owner of whatever folder it lives in" — a document under
+`folder:engineering` inherits access from that folder without copying a permission onto every document.
 
-The exact Python API is still being designed.
+See the [Usage Guide](docs/usage/README.md) for the full, runnable walkthrough — every rewrite operator, nested
+groups, `EvaluationBudget`, and error handling.
 
 ---
 
@@ -308,12 +301,13 @@ Implementation details such as PostgreSQL indexes, transaction mechanisms, and a
 
 ## Planned v1
 
-The first usable release is intentionally narrow.
+The first usable release is intentionally narrow. It is done — see the
+[Usage Guide](docs/usage/README.md) for it working end to end.
 
 ```text
 v1
 ├── structured relationship tuples
-├── AuthorizationModel
+├── Model / compile() / CompiledModel
 ├── direct relationships
 ├── union
 ├── intersection
@@ -321,12 +315,13 @@ v1
 ├── tuple-to-userset
 ├── recursive Check evaluation
 ├── cycle protection
-├── bounded evaluation
+├── bounded evaluation (EvaluationBudget)
 ├── MemoryTupleStore
-├── PostgresTupleStore
-├── storage contract tests
-└── PostgreSQL integration tests
+└── storage contract tests
 ```
+
+`PostgresTupleStore` and PostgreSQL integration tests are v2 — see
+[Architecture § Scope](docs/architecture.md).
 
 The goal is not to reproduce every feature of Google Zanzibar, OpenFGA, or SpiceDB.
 
@@ -521,21 +516,16 @@ Adapter and implementation documents describe **how a particular implementation 
 
 ## Project status
 
-The project is currently in the **design phase**.
-
-The repository intentionally contains specification and architecture work before application code.
-
-Current work focuses on:
+v1 is code-complete: the model, `compile()`, the storage port, `MemoryTupleStore`, and the `Evaluator` all exist and
+are tested.
 
 ```text
 ✓ storage semantics
-→ authorization model
-→ evaluation semantics
-→ public API contract
-→ implementation
+✓ authorization model
+✓ evaluation semantics
+✓ public API contract
+✓ implementation
 ```
-
-The specification may evolve before the first stable release.
 
 Once v1 is released, semantic compatibility will be treated as part of the public API.
 
