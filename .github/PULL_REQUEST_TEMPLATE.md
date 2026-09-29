@@ -24,7 +24,7 @@
 
 ## Checklist
 
-- [ ] I have read the [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [ ] I have read the [Code of Conduct](CODE_OF_CONDUCT.md)
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
 - [ ] Tests added/updated for the behavior changed
 - [ ] `docs/semantics.md` updated, if `TupleStore`/adapter behavior changed
