@@ -13,7 +13,7 @@ No network hop.
 
 The library is designed to be embedded directly into Python applications that need richer authorization semantics than traditional role-based access control.
 
-> **Status:** design and specification phase. The public contracts and authorization semantics are being defined before the implementation is written.
+> **Status:** v1 is code-complete — model, `compile()`, the storage port, `MemoryTupleStore`, and the `Evaluator` all exist and are tested. See [Project status](#project-status).
 
 ---
 
@@ -495,17 +495,13 @@ See [`SECURITY.md`](./SECURITY.md) for the vulnerability disclosure policy.
 
 The repository uses specifications and architecture documents as part of the implementation contract.
 
-Planned documentation includes:
-
 ```text
 docs/
-├── semantics.md
-├── authorization-model.md
-├── evaluation-semantics.md
-├── architecture/
-│   └── ADR-*.md
-├── postgres.md
-└── examples/
+├── README.md        — documentation index, start here
+├── usage/README.md  — worked examples for every rewrite operator, budgets, error handling
+├── architecture.md  — the model shape, compile(), the storage port, the evaluator
+├── semantics.md     — the storage contract every TupleStore adapter must satisfy
+└── errors.md        — the PPxxx error code ranges and what each one means
 ```
 
 The specifications describe **what must be true**.
