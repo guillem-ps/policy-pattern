@@ -17,9 +17,12 @@ class ReadResult:
     `docs/semantics.md` requires that a truncated enumeration never be
     representable as a complete one — `complete` carries that fact in the
     type itself rather than a convention the caller has to already know
-    (e.g. a `limit + 1` sentinel). When more matching tuples exist than the
-    caller's `limit` allowed, `tuples` holds only the first `limit` of them
-    and `complete` is `False`; otherwise `tuples` holds all matches and
+    (e.g. a `limit + 1` sentinel). `tuples` is a `frozenset` — it carries no
+    order of its own. When more matching tuples exist than the caller's
+    `limit` allowed, `tuples` holds at most `limit` of them, deterministically
+    selected by the adapter's own canonical ranking (never arbitrary or
+    hash-order-dependent — see `MemoryTupleStore.read_relation`), and
+    `complete` is `False`; otherwise `tuples` holds all matches and
     `complete` is `True`.
 
     Example:

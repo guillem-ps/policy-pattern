@@ -1,12 +1,5 @@
 """
 Value Object representing an entity identifier.
--Must be immutable, hashable, and comparable.
--An identifier contains the value that identifies an entity and
--the field/type associated with that identifier.
--Example:
--Identifier(value="42", field="document")
--Validation rules:
-- document:42.
 """
 
 from dataclasses import dataclass

@@ -56,7 +56,10 @@ so no adapter is more permissive than another:
 - non-empty,
 - a bounded maximum length (an exact shared constant, not "whatever the
   database column allows"),
-- restricted to a safe character set that excludes control characters.
+- restricted to a safe character set that excludes control characters,
+- no leading or trailing whitespace (accidental padding, not meaningful
+  content — a caller who genuinely needs a boundary space is almost
+  certainly passing in a copy-paste artifact, not an intentional id).
 
 The exact numeric bound is an implementation constant `policy-pattern`
 defines once and every adapter enforces identically — not something each
@@ -81,7 +84,8 @@ or encoding rule when they also appear inside a component's content.
 ```text
 Identifier semantics (this section):
     id/type/relation content — effectively unrestricted, bounded only by
-    length and control-character exclusion above.
+    length, control-character exclusion, and no leading/trailing
+    whitespace, above.
 
 Canonical textual serialization (separate, not yet specified):
     a grammar + escaping scheme that can round-trip any valid identifier

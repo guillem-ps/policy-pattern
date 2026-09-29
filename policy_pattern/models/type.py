@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar
 
+from ..errors import InvalidIdentifierError
 from .identifier import Identifier
 from .operators import PermissionExpression
 from .relation import Relation
@@ -21,11 +22,12 @@ class Type:
     permissions it supports.
 
     Example:
-        Type(name="document")
+        Type(name="document", relations={}, permissions={})
 
     Raises:
         InvalidIdentifierError: Propagated from `Identifier` if `name`, a
-            relation name, or a permission name is invalid.
+            relation name, or a permission name is invalid, or if `name`
+            contains '#' (reserved for userset notation).
     """
 
     name: str
@@ -51,6 +53,16 @@ class Type:
         original dict (once copied) can affect this instance afterward.
         """
         Identifier(value=self.name, field=self._TYPE_NAME_FIELD)
+        if "#" in self.name:
+            # Reserved for userset notation ("type#relation") inside
+            # Relation.allowed_subject_types — _schema_validation.py tells a
+            # plain type-name entry apart from a userset one by checking for
+            # "#" in the string. If a real Type name could contain "#" too,
+            # that check couldn't tell them apart.
+            raise InvalidIdentifierError(
+                message=f"type name {self.name!r} cannot contain '#' — reserved for userset notation",
+                related=f"field={self._TYPE_NAME_FIELD!r}",
+            )
         for relation_name in self.relations:
             Identifier(value=relation_name, field=self._RELATION_NAME_FIELD)
         for permission_name in self.permissions:

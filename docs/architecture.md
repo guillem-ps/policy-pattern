@@ -207,7 +207,11 @@ clean port boundary.
   `MappingProxyType` over a copy of the input dict in `__post_init__` — a
   plain `dict` field on a frozen dataclass is still mutable in place and
   unhashable, the same gotcha already noted for `Relation`'s `tuple` vs
-  `list` choice above.
+  `list` choice above. `name` forbids `#` — one restriction beyond the
+  general `Identifier` bound (`docs/semantics.md`): `#` is reserved for
+  userset notation (`"type#relation"`) inside `Relation.allowed_subject_types`,
+  and a real `Type.name` that could also contain `#` would make that
+  notation ambiguous to tell apart from a plain type-name entry.
 - `Model(types: dict[str, Type])` — the whole schema, deliberately **not**
   frozen (mutable, authoring-time, built up incrementally), plus
   `.compile() -> CompiledModel`.
@@ -262,8 +266,11 @@ class Evaluator:
   `docs/errors.md`.
 - `ModelValidationError` (`PP101`, `compile()`-time only) — raised by
   `Model.compile()` for an undeclared `Reference`/`tupleset` name, a
-  `tupleset` resolving to a `Permission` instead of a `Relation`, or the
-  exhaustiveness fallback for an unrecognized expression type.
+  `tupleset` resolving to a `Permission` instead of a `Relation`, a
+  `TupleToUserset.computed` that doesn't resolve to a relation or
+  permission on every plain-type target the tupleset relation's
+  `allowed_subject_types` allows, or the exhaustiveness fallback for an
+  unrecognized expression type.
 - `EvaluationError` (`PP201`, runtime: budget exceeded, cycle detected).
 
 No `StorageError` class in v1: `MemoryTupleStore` never raises a storage
