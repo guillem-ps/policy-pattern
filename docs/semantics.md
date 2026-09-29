@@ -7,12 +7,11 @@ adapter's Python interface. Every adapter (`MemoryTupleStore`,
 `PostgresTupleStore`, and any future one) must satisfy the contract below,
 verified by a shared contract test suite that runs against all of them.
 
-This document currently covers **storage semantics** only — mutations,
-reads, and consistency. Evaluation semantics (union, intersection,
-exclusion, tuple-to-userset, recursion, cycle handling) and public API
-semantics (`check()`'s exact error contract) get their own sections once the
-evaluator design is settled; this is not an oversight, the evaluator has not
-been designed yet.
+This document covers **storage semantics** only — mutations, reads, and
+consistency. Evaluation semantics (union, intersection, exclusion,
+tuple-to-userset, recursion, cycle handling) and public API semantics
+(`check()`'s exact error contract) live in `docs/architecture.md` instead —
+deliberately not duplicated here.
 
 A note on scope: this document states *what must be true*. It deliberately
 avoids naming how a specific adapter achieves it (e.g. which PostgreSQL
