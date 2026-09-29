@@ -29,6 +29,23 @@ def test_type_invalid_name() -> None:
         Type(name="", relations={}, permissions={})
 
 
+def test_type_name_cannot_contain_hash() -> None:
+    """
+    Test that a Type name containing '#' raises InvalidIdentifierError.
+
+    '#' is reserved for userset notation ("type#relation") inside
+    Relation.allowed_subject_types — _schema_validation.py tells the two
+    apart by checking for '#' in each entry. If a real Type name could
+    also contain '#', a plain-type entry that happened to match one would
+    be silently treated as a userset reference instead, skipping the
+    TupleToUserset.computed validation entirely. Forbidding '#' in Type
+    names makes that ambiguity structurally impossible instead of relying
+    on nobody ever naming a type that way.
+    """
+    with raises(InvalidIdentifierError):
+        Type(name="folder#archive", relations={}, permissions={})
+
+
 def test_type_invalid_relation_key_raises() -> None:
     """
     Test that an InvalidIdentifierError is raised when a relations key is invalid.
