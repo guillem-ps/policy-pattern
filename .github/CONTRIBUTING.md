@@ -1,7 +1,7 @@
 # Contributing
 
 Contributions are welcome once the initial semantic model and public interfaces stabilize. Until then, expect
-significant churn — check [`docs/architecture.md`](docs/architecture.md) § Scope before proposing a feature that
+significant churn — check [`docs/architecture.md`](../docs/architecture.md) § Scope before proposing a feature that
 might already be planned or explicitly out of scope.
 
 Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -14,7 +14,7 @@ include:
 - compatibility considerations,
 - updates to the relevant specification (`docs/semantics.md`, `docs/architecture.md`) if behavior changed.
 
-Security vulnerabilities should be reported according to [`SECURITY.md`](SECURITY.md), not through a public issue.
+Security vulnerabilities should be reported according to [`SECURITY.md`](../SECURITY.md), not through a public issue.
 
 ## Testing strategy
 
@@ -30,7 +30,7 @@ Authorization behavior is tested at several levels:
   storage failures, incomplete reads, truncated enumeration, concurrent mutations, snapshot drift, malformed
   relationship graphs, recursion limits.
 
-Run locally with `make test` (or `make coverage` for a coverage report) — see the [Makefile](Makefile) for every
+Run locally with `make test` (or `make coverage` for a coverage report) — see the [Makefile](../Makefile) for every
 available target.
 
 ## Pull requests
