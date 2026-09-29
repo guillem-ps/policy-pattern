@@ -326,16 +326,17 @@ must not be able to collapse "budget exhausted" into "relation has no
 further members" — that distinction has to survive all the way up through
 union, intersection, exclusion, and tuple-to-userset.
 
-### `read_tuples(...)` result shape
+### `read_relation(...)` result shape
 
-Returns a **set** — never duplicates. Ordering is unspecified. Filtering is
-exact match on the requested fields; no partial or fuzzy matching.
+Returns a **set** (a `frozenset`, per `ReadResult.tuples`) — never
+duplicates. Ordering is unspecified. Filtering is exact match on the
+requested fields; no partial or fuzzy matching.
 
 Subject usersets (e.g. `group:eng#member` as a subject) are returned exactly
-as stored — `read_tuples` does not resolve or expand them. Resolution is the
-evaluator's job, not storage's.
+as stored — `read_relation` does not resolve or expand them. Resolution is
+the evaluator's job, not storage's.
 
-A single logical `read_tuples()` call must reflect **one** consistent store
+A single logical `read_relation()` call must reflect **one** consistent store
 state, even if an adapter implements it internally via multiple statements
 or pages. If a read can't be answered from one consistent state, it must
 fail rather than silently blend two states — the same principle as
@@ -388,7 +389,7 @@ lifetime of a `check()`.
 ### The port must expose an evaluation-scoped view
 
 Snapshot consistency across *multiple reads* cannot be a property `check()`
-gets for free — each individual `read_tuples()` call being internally
+gets for free — each individual `read_relation()` call being internally
 consistent (see above) says nothing about two separate calls agreeing with
 each other. If the evaluator makes ten reads while resolving one `check()`,
 the port needs a way to say "these ten belong to the same view." Naming a
