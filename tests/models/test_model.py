@@ -114,6 +114,73 @@ def test_model_compile_undeclared_reference_raises() -> None:
     assert exc_info.value.message == "document.view references undeclared name 'missing'"
 
 
+def test_model_compile_tuple_to_userset_target_type_must_be_declared_raises() -> None:
+    """
+    Test that a tupleset relation's allowed_subject_types must name only declared Types.
+
+    "folder" is a legitimate-looking type name in allowed_subject_types,
+    but this model never declares a "folder" Type — computed="viewer"
+    could never be checked against it. IMPORTANT (TupleToUserset gap).
+    """
+    document = Type(
+        name="document",
+        relations={"parent": Relation(allowed_subject_types=("folder",))},
+        permissions={"inherited_viewer": TupleToUserset(tupleset="parent", computed="viewer")},
+    )
+    model = Model(types={"document": document})
+
+    with raises(ModelValidationError) as exc_info:
+        model.compile()
+
+    assert exc_info.value.message == "document.inherited_viewer tupleset 'parent' allows undeclared type 'folder'"
+
+
+def test_model_compile_tuple_to_userset_computed_must_exist_on_target_type_raises() -> None:
+    """
+    Test that TupleToUserset.computed must exist on every plain-type target the tupleset relation allows.
+
+    IMPORTANT (TupleToUserset gap): "does_not_exist" was previously
+    accepted by compile() with no check at all, only surfacing later as
+    UnknownNameError at check()-time.
+    """
+    document = Type(
+        name="document",
+        relations={"parent": Relation(allowed_subject_types=("folder",))},
+        permissions={"inherited_viewer": TupleToUserset(tupleset="parent", computed="does_not_exist")},
+    )
+    folder = Type(name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={})
+    model = Model(types={"document": document, "folder": folder})
+
+    with raises(ModelValidationError) as exc_info:
+        model.compile()
+
+    assert exc_info.value.message == (
+        "document.inherited_viewer computed 'does_not_exist' is not declared as a relation or permission on 'folder'"
+    )
+
+
+def test_model_compile_tuple_to_userset_ignores_userset_shaped_allowed_subject_type() -> None:
+    """
+    Test that a userset-shaped allowed_subject_types entry ("type#relation") is never validated as a traversal target.
+
+    _check_tuple_to_userset only ever follows DirectSubject entries, so a
+    userset-shaped entry can never actually be the "related object"
+    computed is checked against — it must not be required to name a
+    declared Type, unlike a plain-type entry.
+    """
+    document = Type(
+        name="document",
+        relations={"parent": Relation(allowed_subject_types=("folder", "workspace#member"))},
+        permissions={"inherited_viewer": TupleToUserset(tupleset="parent", computed="viewer")},
+    )
+    folder = Type(name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={})
+    model = Model(types={"document": document, "folder": folder})
+
+    compiled = model.compile()
+
+    assert "document" in compiled.types
+
+
 def test_model_compile_tupleset_must_be_relation_raises() -> None:
     """
     Test that a TupleToUserset whose tupleset resolves to a permission (not a relation) raises ModelValidationError.

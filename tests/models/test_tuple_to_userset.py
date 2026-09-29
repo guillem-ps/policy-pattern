@@ -43,6 +43,15 @@ def test_tuple_to_userset_inequality_different_computed() -> None:
     assert TupleToUserset(tupleset="parent", computed="viewer") != TupleToUserset(tupleset="parent", computed="editor")
 
 
+def test_tuple_to_userset_hash_consistency() -> None:
+    """
+    Test that the hash of two TupleToUserset instances with the same fields is equal.
+    """
+    tuple_to_userset1 = TupleToUserset(tupleset="parent", computed="viewer")
+    tuple_to_userset2 = TupleToUserset(tupleset="parent", computed="viewer")
+    assert hash(tuple_to_userset1) == hash(tuple_to_userset2)
+
+
 def test_tuple_to_userset_is_frozen() -> None:
     """
     Test that TupleToUserset instances cannot be mutated after construction.
