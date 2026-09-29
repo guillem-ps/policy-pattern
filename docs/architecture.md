@@ -419,6 +419,28 @@ caller-provided fixture set of checks, never store-wide enumeration, since
 `semantics.md` already declares no subject-keyed query / no `ListObjects` as
 a v1 non-goal for the storage port.
 
+## Beyond v2 (unscheduled)
+
+Ideas with no target version yet — not committed to any release, listed so
+a future proposal for one of these isn't mistaken for a new idea:
+
+- **Reverse lookup** — `ListObjects(subject, relation, object_type)` for
+  "which documents can user:7 view?" questions. Different storage access
+  pattern from forward `check()`; excluded from the v1 storage port (see
+  above).
+- **Contextual tuples** — request-scoped relationships that participate in
+  one `check()` without being persisted (facts derived from a request,
+  token, or application state).
+- **Batch checks** — evaluate multiple authorization questions while safely
+  reusing evaluation state across them.
+- **Model versioning** — explicit versioning and migration of authorization
+  models as applications evolve.
+- **Advanced consistency** — consistency tokens or another mechanism for
+  callers that need a decision tied to a specific, externally-observed
+  version of the store.
+- **Operational capabilities** — bulk tuple deletion by pattern,
+  audit-oriented metadata/history, change notifications.
+
 ## Sync, not async
 
 The core (`Evaluator`, `TupleStore`) is synchronous. Evaluation is
