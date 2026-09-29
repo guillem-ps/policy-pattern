@@ -216,9 +216,9 @@ the same reason: an ambiguous or unbounded evaluation is not a safe "no."
 | Exception | Code | Raised when |
 | --- | --- | --- |
 | `ModelValidationError` | `PP101` | `compile()` finds an undeclared reference or a `tupleset` that isn't a relation |
-| `UnknownTypeError` | `PP004` | `check()` (or userset expansion) references a type not declared in the `CompiledModel` |
-| `UnknownNameError` | `PP005` | `check()` references a name declared as neither a relation nor a permission |
 | `EvaluationError` | `PP201` | A cycle was detected, or an `EvaluationBudget` limit was exceeded |
+| `UnknownTypeError` | `PP202` | `check()` (or userset expansion) references a type not declared in the `CompiledModel` |
+| `UnknownNameError` | `PP203` | `check()` references a name declared as neither a relation nor a permission |
 
 ```python
 from policy_pattern.errors import UnknownTypeError

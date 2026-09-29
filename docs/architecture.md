@@ -255,12 +255,13 @@ class Evaluator:
 - `InvalidIdentifierError` (`PP001`), `InvalidRelationError` (`PP002`),
   `InvalidMutationError` (`PP003`) — construction-time validation errors,
   raised from a Value Object's own `__post_init__`.
-- `UnknownTypeError` (`PP004`), `UnknownNameError` (`PP005`) — also
-  `PP0xx` by category, but raised from `Evaluator._check_name` against an
-  already-compiled model, not from a Value Object's `__post_init__`:
-  `UnknownTypeError` when `check()` (or userset expansion) references a
-  type the `CompiledModel` never declared; `UnknownNameError` when the
-  name is declared as neither a relation nor a permission on its type.
+- `UnknownTypeError` (`PP202`), `UnknownNameError` (`PP203`) — raised from
+  `Evaluator._check_name` against an already-compiled model, not from a
+  Value Object's `__post_init__`: `UnknownTypeError` when `check()` (or
+  userset expansion) references a type the `CompiledModel` never
+  declared; `UnknownNameError` when the name is declared as neither a
+  relation nor a permission on its type. Both are `PP2xx` (evaluation
+  runtime), next to `EvaluationError` (`PP201`).
   The actual code-to-class registry lives in `policy_pattern/errors/`
   itself (`grep -r 'code = "PP'`), not duplicated here or in
   `docs/errors.md`.
@@ -289,8 +290,8 @@ policy_pattern/
 │   ├── identifier_error.py       # InvalidIdentifierError (PP001)
 │   ├── relation_error.py         # InvalidRelationError (PP002)
 │   ├── mutation_error.py         # InvalidMutationError (PP003)
-│   ├── unknown_type_error.py     # UnknownTypeError (PP004)
-│   ├── unknown_name_error.py     # UnknownNameError (PP005)
+│   ├── unknown_type_error.py     # UnknownTypeError (PP202)
+│   ├── unknown_name_error.py     # UnknownNameError (PP203)
 │   ├── model_validation_error.py # ModelValidationError (PP101)
 │   └── evaluation_error.py       # EvaluationError (PP201)
 ├── models/

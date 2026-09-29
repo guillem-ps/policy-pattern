@@ -13,4 +13,4 @@ class UnknownTypeError(BaseError):
         code (ClassVar[str]): A unique error code for the specific error type.
     """
 
-    code = "PP004"
+    code = "PP202"
