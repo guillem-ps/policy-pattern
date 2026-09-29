@@ -4,6 +4,8 @@ Contributions are welcome once the initial semantic model and public interfaces 
 significant churn — check [`docs/architecture.md`](docs/architecture.md) § Scope before proposing a feature that
 might already be planned or explicitly out of scope.
 
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 Because this library participates in authorization decisions, changes affecting semantics or security should
 include:
 
