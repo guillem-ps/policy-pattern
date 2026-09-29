@@ -502,9 +502,6 @@ which reproduces the exact snapshot-drift bug the view exists to prevent.
 > stable for its lifetime" is part of the contract — the copy-based
 > mechanism is one way to get there, not the requirement itself.
 
-<!-- ponytail: full copy per evaluation scope, not fine-grained MVCC —
-     correct is more important than fast for a memory adapter used in
-     tests/demos. Real concurrent throughput is PostgresTupleStore's job. -->
 
 ## Explicit non-goals (v1)
 

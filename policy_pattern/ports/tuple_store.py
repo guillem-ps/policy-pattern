@@ -113,9 +113,6 @@ class View(ABC):
 
         See `ReadResult`'s docstring for what `complete=False` means and
         when it is set. An adapter must not materialize more than
-        `limit + 1` matching tuples before returning — see
-        `docs/superpowers/specs/2026-09-25-tuple-store-port-design.md` for
-        why this is a discipline the implementation owes, not something the
-        type signature alone can enforce.
+        `limit + 1` matching tuples before returning — that would violate the contract.
         """
         raise NotImplementedError
