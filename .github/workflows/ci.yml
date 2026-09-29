@@ -47,6 +47,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Gitleaks
-        uses: docker://zricethezav/gitleaks:latest
+        uses: docker://zricethezav/gitleaks:v8.27.0 # keep in sync with .pre-commit-config.yaml's gitleaks rev
         with:
           args: detect --source=/github/workspace --redact --verbose
