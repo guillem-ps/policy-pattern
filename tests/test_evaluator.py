@@ -5,6 +5,10 @@ Test module for evaluator.py.
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
+from os import environ
+from pathlib import Path
+from subprocess import run
+from sys import executable
 from typing import override
 
 from pytest import raises
@@ -223,6 +227,71 @@ def test_check_relation_checking_a_subject_set_itself() -> None:
     assert evaluator.check(eng_members, "member", leads) is True
 
 
+def test_check_relation_ignores_tuple_with_disallowed_subject_type() -> None:
+    """
+    Test that check() never counts a stored tuple whose subject type isn't in Relation.allowed_subject_types.
+
+    group:a#member only allows ("user", "group#member") — a tuple whose
+    subject is itself a bare group (DirectSubject of type "group", not a
+    SubjectSet) is malformed data that should never have been written;
+    check() must not treat it as proof of membership. BLOCKER 1.
+    """
+    model = _group_model()
+    store = MemoryTupleStore()
+    group_a = _group("a")
+    rogue_subject = DirectSubject(object=_group("rogue"))
+    store.write_tuples(
+        Mutation(
+            additions=frozenset({Tuple(subject=rogue_subject, relation="member", object=group_a)}),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.check(rogue_subject, "member", group_a) is False
+
+
+def test_check_relation_ignores_userset_expansion_with_disallowed_shape() -> None:
+    """
+    Test that check() never follows a SubjectSet whose "type#relation" shape isn't in allowed_subject_types.
+
+    document:42#owner only allows ("user",) — no userset form declared.
+    A tuple document:42#owner@group:eng#member is malformed; even though
+    alice is a real member of group:eng, check() must not use that path
+    to grant owner. BLOCKER 1.
+    """
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+            "group": Type(
+                name="group", relations={"member": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    group_eng = ObjectReference(type="group", id="eng")
+    document_42 = ObjectReference(type="document", id="42")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(
+                        subject=SubjectSet(object=group_eng, relation="member"), relation="owner", object=document_42
+                    ),
+                    Tuple(subject=alice, relation="member", object=group_eng),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.check(alice, "owner", document_42) is False
+
+
 def test_check_relation_cycle_raises_evaluation_error() -> None:
     """
     Test that a mutual userset cycle (group:a#member -> group:b#member -> group:a#member) raises EvaluationError.
@@ -246,6 +315,36 @@ def test_check_relation_cycle_raises_evaluation_error() -> None:
 
     with raises(EvaluationError):
         evaluator.check(_direct("alice"), "member", group_a)
+
+
+_EVALUATOR_DETERMINISM_PROBE: Path = Path(__file__).parent / "evaluator_determinism_probe.py"
+
+
+def test_check_relation_userset_expansion_order_is_deterministic_across_processes() -> None:
+    """
+    Test that check()'s userset-expansion order (and thus its verdict) is stable across PYTHONHASHSEED values.
+
+    group:a#member has two SubjectSet branches: one cycles straight back
+    to (group:a, "member") itself, the other resolves cleanly to True via
+    group:c. Which branch any() visits first decides whether check()
+    returns True or raises EvaluationError — before the fix that was
+    frozenset iteration order (hash-seed dependent, proven empirically:
+    varies across PYTHONHASHSEED); after the fix it must be a canonical
+    repr-sorted order, identical in every process. BLOCKER 2.
+    """
+    outputs = {
+        seed: run(  # noqa: S603 — the command and script path are fixed test data
+            [executable, str(_EVALUATOR_DETERMINISM_PROBE)],
+            env={**environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=False,
+        ).stdout
+        for seed in ("1", "2", "3", "42", "999")
+    }
+
+    assert len(set(outputs.values())) == 1, outputs
 
 
 def _chain_of_groups(length: int) -> list[ObjectReference]:
@@ -368,8 +467,21 @@ def test_check_raises_unknown_type_error_for_undeclared_object_type() -> None:
 def test_check_raises_unknown_type_error_via_userset_expansion() -> None:
     """
     Test that userset expansion into a SubjectSet with an undeclared object.type raises UnknownTypeError.
+
+    "document#member" must be an allowed shape on this relation — otherwise
+    the BLOCKER 1 shape guard filters the tuple out before ever reaching
+    the type lookup this test exists to exercise, and "document" itself is
+    still never declared as an actual Type in this model.
     """
-    model = _group_model()
+    model = CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"member": Relation(allowed_subject_types=("user", "group#member", "document#member"))},
+                permissions={},
+            ),
+        }
+    )
     store = MemoryTupleStore()
     group_a = _group("a")
     undeclared = SubjectSet(object=ObjectReference(type="document", id="42"), relation="member")

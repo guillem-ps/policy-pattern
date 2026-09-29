@@ -172,9 +172,24 @@ class Evaluator:
     def _check_relation(self, subject: Subject, name: str, object: ObjectReference, context: EvaluationContext) -> bool:
         """
         Exact tuple lookup, then bounded userset expansion for any SubjectSet found.
+
+        Every candidate subject's shape is checked against this Relation's
+        own `allowed_subject_types` before it counts — `TupleStore` is
+        schema-agnostic by design (docs/architecture.md), so it never
+        rejects a malformed write; this is the one place that knows both
+        the schema and the stored fact, so it is the actual trust boundary.
+        A tuple whose subject shape isn't declared is inert: never a match,
+        never followed.
         """
+        relation = self._model.types[object.type].relations[name]
+
+        def shape_allowed(candidate: Subject) -> bool:
+            if isinstance(candidate, DirectSubject):
+                return candidate.object.type in relation.allowed_subject_types
+            return f"{candidate.object.type}#{candidate.relation}" in relation.allowed_subject_types
+
         self._charge_read(context, object, name)
-        if context.view.read_tuple(subject, name, object):
+        if shape_allowed(subject) and context.view.read_tuple(subject, name, object):
             return True
 
         self._charge_read(context, object, name)
@@ -187,8 +202,9 @@ class Evaluator:
 
         return any(
             isinstance(t.subject, SubjectSet)
+            and shape_allowed(t.subject)
             and self._check_name(subject, t.subject.relation, t.subject.object, context)
-            for t in result.tuples
+            for t in sorted(result.tuples, key=repr)
         )
 
     def _check_permission(
@@ -231,8 +247,13 @@ class Evaluator:
 
         Only DirectSubject entries are followed — a SubjectSet stored under
         the tupleset relation has no single "related object" to jump to, so
-        it does not participate in traversal.
+        it does not participate in traversal. A DirectSubject whose type
+        isn't declared in the tupleset Relation's own `allowed_subject_types`
+        is malformed data and is skipped the same way `_check_relation`
+        skips a malformed direct/userset match.
         """
+        relation = self._model.types[object.type].relations[expression.tupleset]
+
         self._charge_read(context, object, expression.tupleset)
         result = context.view.read_relation(
             object, expression.tupleset, limit=context.budget.max_nodes - context.node_count
@@ -245,8 +266,9 @@ class Evaluator:
 
         return any(
             isinstance(t.subject, DirectSubject)
+            and t.subject.object.type in relation.allowed_subject_types
             and self._check_name(subject, expression.computed, t.subject.object, context)
-            for t in result.tuples
+            for t in sorted(result.tuples, key=repr)
         )
 
     def _charge_read(self, context: EvaluationContext, object: ObjectReference, name: str) -> None:

@@ -4,6 +4,7 @@ In-memory TupleStore adapter — demo/test adapter, no throughput requirement.
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from heapq import nsmallest
 from threading import Lock
 from typing import override
 
@@ -110,15 +111,20 @@ class _MemoryView(View):
                 `limit` matches exist, the result is truncated to exactly
                 `limit` and `complete=False`.
 
-        Matches are sorted by `repr()` before truncating — `frozenset`
+        Matches are ranked by `repr()` before truncating — `frozenset`
         iteration order is not stable (hash randomization), and an
         unordered scan would make which tuples survive truncation vary
         between runs with identical data, breaking
-        docs/architecture.md's determinism guarantee. `limit=0` needs no
-        special-casing: it is already well-defined (immediately
-        incomplete if any match exists, complete-and-empty otherwise).
+        docs/architecture.md's determinism guarantee. `heapq.nsmallest`
+        keeps only `limit + 1` candidates in memory at a time, rather than
+        `sorted()`'s full match set — with a huge match set and a small
+        limit, that is the difference between O(limit) and O(match count)
+        memory. `limit=0` needs no special-casing: it is already
+        well-defined (immediately incomplete if any match exists,
+        complete-and-empty otherwise).
         """
-        candidates: list[Tuple] = sorted(
+        candidates: list[Tuple] = nsmallest(
+            limit + 1,
             (t for t in self.tuples if t.object == object and t.relation == relation),
             key=repr,
         )

@@ -6,6 +6,7 @@ from os import environ
 from pathlib import Path
 from subprocess import run
 from sys import executable
+from tracemalloc import get_traced_memory, start, stop
 
 from pytest import raises
 
@@ -108,6 +109,38 @@ def test_read_relation_with_limit_zero_reports_incomplete_when_matches_exist() -
         result = view.read_relation(ObjectReference(type="document", id="42"), "owner", limit=0)
 
     assert result == ReadResult(tuples=frozenset(), complete=False)
+
+
+def test_read_relation_does_not_materialize_all_matches_before_truncating() -> None:
+    """
+    Test that read_relation() bounds peak memory to ~limit, not to the full match count.
+
+    A naive `sorted(matching_candidates)` must fully materialize every
+    match before truncating — with a huge match set and a small limit,
+    that peaks at O(match count) instead of O(limit). This measures the
+    actual allocation, not just the returned value (identical either way).
+    Empirically: unfixed peaks at ~43MB for 200k matches; bounded to
+    limit+1 peaks at a few KB. BLOCKER 3.
+    """
+    store = MemoryTupleStore()
+    document_42 = ObjectReference(type="document", id="42")
+    tuples = frozenset(
+        Tuple(
+            subject=DirectSubject(object=ObjectReference(type="user", id=f"user-{i}")),
+            relation="owner",
+            object=document_42,
+        )
+        for i in range(200_000)
+    )
+    store.write_tuples(Mutation(additions=tuples, deletions=frozenset()))
+
+    with store.snapshot() as view:
+        start()
+        view.read_relation(document_42, "owner", limit=5)
+        _, peak = get_traced_memory()
+        stop()
+
+    assert peak < 1_000_000, peak
 
 
 _DETERMINISM_PROBE: Path = Path(__file__).parent / "determinism_probe.py"
