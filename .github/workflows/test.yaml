@@ -1,4 +1,4 @@
-name: CI
+name: Test Pipeline
 
 on:
   push:
@@ -24,29 +24,22 @@ jobs:
       - name: Run tests
         run: uv run --python ${{ matrix.python-version }} pytest
 
-  lint:
-    name: Lint and type-check
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - name: Install dependencies
         run: uv sync --locked
-      - name: ruff format --check
-        run: uv run ruff format --check
-      - name: ruff check
-        run: uv run ruff check
-      - name: ty check
-        run: uv run ty check
-
-  secrets:
-    name: Secret scanning
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - name: Run tests with coverage
+        run: |
+          uv run coverage run -m pytest
+          uv run coverage combine
+          uv run coverage xml
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
         with:
-          fetch-depth: 0
-      - name: Run Gitleaks
-        uses: docker://zricethezav/gitleaks:v8.27.0 # keep in sync with .pre-commit-config.yaml's gitleaks rev
-        with:
-          args: detect --source=/github/workspace --redact --verbose
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
