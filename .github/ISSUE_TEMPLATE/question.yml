@@ -1,0 +1,11 @@
+name: Question
+description: Ask how to use policy-pattern, without opening a bug or feature request
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do
+      description: Context helps more than the question in isolation — what are you building, what have you tried?
+    validations:
+      required: true
