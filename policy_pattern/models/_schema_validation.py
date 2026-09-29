@@ -85,7 +85,7 @@ def _validate_expression(
         _validate_expression(expression.exclude, types, type_declaration, type_name, permission_name)
     else:
         raise ModelValidationError(
-            message=f"{type_name}.{permission_name} contains unknown expression type {type(expression).__name__}",
+            message=f"{type_name}.{permission_name} contains unknown expression type {type(expression).__name__!r}",
             related=f"type={type_name!r}",
         )
 

@@ -744,8 +744,10 @@ def test_check_permission_unknown_expression_type_raises() -> None:
 
     with store.snapshot() as view:
         context = EvaluationContext(view=view, budget=EvaluationBudget())
-        with raises(EvaluationError):
-            evaluator._check_permission(alice, PermissionExpression(), document, context)
+        with raises(EvaluationError) as exc_info:
+            evaluator._check_permission(alice, PermissionExpression(), document, context)  # pyright: ignore[reportPrivateUsage]
+
+    assert exc_info.value.message == "unknown expression type 'PermissionExpression'"
 
 
 def _folder(id_: str) -> ObjectReference:

@@ -42,7 +42,7 @@ class Identifier:
         """
         if not self._MIN_VALUE_LENGTH <= len(self.value) <= self._MAX_VALUE_LENGTH:
             raise InvalidIdentifierError(
-                message=f"identifier value length must be between {self._MIN_VALUE_LENGTH} and {self._MAX_VALUE_LENGTH}",  # noqa: E501
+                message=f"identifier value length must be between {self._MIN_VALUE_LENGTH!r} and {self._MAX_VALUE_LENGTH!r}",  # noqa: E501
                 related=f"field={self.field!r}",
             )
 

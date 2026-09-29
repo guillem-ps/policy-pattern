@@ -293,7 +293,7 @@ def test_model_compile_unknown_expression_type_raises() -> None:
     with raises(ModelValidationError) as exc_info:
         model.compile()
 
-    assert exc_info.value.message == "document.view contains unknown expression type PermissionExpression"
+    assert exc_info.value.message == "document.view contains unknown expression type 'PermissionExpression'"
 
 
 def test_model_compile_rejects_name_used_as_both_relation_and_permission() -> None:

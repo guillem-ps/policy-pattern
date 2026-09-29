@@ -135,13 +135,13 @@ class Evaluator:
 
         if len(context.visited) >= context.budget.max_depth:
             raise EvaluationError(
-                message=f"max_depth={context.budget.max_depth} exceeded evaluating {name!r} on {object!r}",
+                message=f"max_depth={context.budget.max_depth!r} exceeded evaluating {name!r} on {object!r}",
                 related=f"object={object!r}",
             )
         context.node_count += 1
         if context.node_count > context.budget.max_nodes:
             raise EvaluationError(
-                message=f"max_nodes={context.budget.max_nodes} exceeded evaluating {name!r} on {object!r}",
+                message=f"max_nodes={context.budget.max_nodes!r} exceeded evaluating {name!r} on {object!r}",
                 related=f"object={object!r}",
             )
 
@@ -235,7 +235,7 @@ class Evaluator:
             exclude = self._check_permission(subject, expression.exclude, object, context)
             return include and not exclude
         raise EvaluationError(
-            message=f"unknown expression type {type(expression).__name__}",
+            message=f"unknown expression type {type(expression).__name__!r}",
             related=f"object={object!r}",
         )
 
@@ -278,6 +278,8 @@ class Evaluator:
         context.store_read_count += 1
         if context.store_read_count > context.budget.max_store_reads:
             raise EvaluationError(
-                message=f"max_store_reads={context.budget.max_store_reads} exceeded evaluating {name!r} on {object!r}",
+                message=(
+                    f"max_store_reads={context.budget.max_store_reads!r} exceeded evaluating {name!r} on {object!r}"
+                ),
                 related=f"object={object!r}",
             )
