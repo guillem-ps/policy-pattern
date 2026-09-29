@@ -29,6 +29,7 @@
 - [ ] Tests added/updated for the behavior changed
 - [ ] `docs/semantics.md` updated, if `TupleStore`/adapter behavior changed
 - [ ] `docs/architecture.md` updated, if the model/evaluator shape changed
+- [ ] `CHANGELOG.md` updated under `[Unreleased]`, if user-visible behavior changed
 - [ ] `make test` and `make lint` pass locally (matches CI); `uv run ruff format --check` clean
 - [ ] Considered security implications; if breaking, explained above
 

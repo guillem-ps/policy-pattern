@@ -41,6 +41,9 @@ Key paths:
   adapter exists — a single-adapter contract suite proves nothing yet.
 - [`pyproject.toml`](pyproject.toml): package metadata and tool configuration (PEP 621).
 - `uv.lock`: locked, reproducible dependency resolution — commit it.
+- [`CHANGELOG.md`](CHANGELOG.md): Keep a Changelog format. Add an entry
+  under `[Unreleased]` for any user-visible behavior change; released
+  versions get their own heading once tagged.
 - Governance/community files: [`CONTRIBUTING.md`](.github/CONTRIBUTING.md),
   [`CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md),
   [`SECURITY.md`](SECURITY.md), [`CODEOWNERS`](.github/CODEOWNERS) — human
@@ -156,8 +159,18 @@ Where a given kind of change lands, and what else it forces you to touch:
 
 - Build distributions locally: `uv build`
 - **Do not publish packages manually from an agent session.**
-- Releases use PyPI Trusted Publishing (OIDC) via GitHub Actions — no
-  long-lived PyPI API token stored as a repo secret.
+- Releases are fully automated by [`.github/workflows/release.yaml`](.github/workflows/release.yaml)
+  on every push to `master`: [python-semantic-release](https://python-semantic-release.readthedocs.io)
+  inspects Conventional Commits since the last tag, bumps `pyproject.toml`'s
+  `version`, generates the changelog entry, commits, tags (`vX.Y.Z`), and
+  creates the GitHub Release — then, only if a release actually happened,
+  builds and publishes to PyPI via Trusted Publishing (OIDC, no long-lived
+  API token stored as a repo secret).
+- While `policy-pattern` is `0.x`, `major_on_zero = true`
+  (`pyproject.toml` `[tool.semantic_release]`) means even a `BREAKING
+  CHANGE` bumps the minor digit, never jumps to `1.0.0` — that jump is a
+  deliberate, manual decision once the API is considered stable, not
+  something a commit message can trigger by accident.
 
 ## Security
 

@@ -50,12 +50,14 @@ coverage = ["coverage[toml]>=7.0.0"]
 develop = ["pre-commit>=4.0.0"]
 format = ["ruff>=0.16.7"]
 lint = ["ruff>=0.16.7", "ty>=0.0.80", { include-group = "test" }]
+release = ["python-semantic-release>=9.15.0"]
 test = ["pytest>=9.1.1", "testcontainers>=4.15.0", { include-group = "coverage" }]
 all = [
     { include-group = "coverage" },
     { include-group = "develop" },
     { include-group = "format" },
     { include-group = "lint" },
+    { include-group = "release" },
     { include-group = "test" },
 ]
 # uv installs the "dev" group automatically on a bare `uv sync` (no
@@ -177,3 +179,20 @@ missing-override-decorator = "error"
 missing-type-argument = "error"
 possibly-unresolved-reference = "warn"
 unsound-return-statement = "error"
+
+[tool.semantic_release]
+allow_zero_version = true
+major_on_zero = true
+commit_message = "chore(release): {version}"
+commit_parser = "conventional"
+no_git_verify = true
+tag_format = "v{version}"
+version_toml = ["pyproject.toml:project.version"]
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf", "build"]
+allowed_tags = ["feat", "fix", "perf", "build", "docs", "test", "refactor", "ci", "chore"]
+default_bump_level = 0
+parse_squash_commits = false
+ignore_merge_commits = true
