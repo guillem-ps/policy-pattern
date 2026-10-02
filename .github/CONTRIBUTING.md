@@ -37,3 +37,15 @@ available target.
 
 Use the PR template's checklist. Commit messages follow
 [Conventional Commits](https://www.conventionalcommits.org).
+
+## Force-retriggering CI on an open PR
+
+`test.yaml`, `lint.yaml`, `secrets.yaml`, and `codeql.yaml` also run whenever the `retrigger-ci` label is
+added to a PR (the `if:` guard on each job ignores any other label, so normal triage labels like `bug` never
+trigger a run). Add it from the PR page, or with `gh pr edit <PR#> --add-label retrigger-ci`.
+
+A label can't fire the same event twice in a row while it stays applied — remove it first if you need to
+trigger again later.
+
+This is for an **open PR's own checks** specifically — only a `labeled`/`synchronize`/`reopened` event on
+that exact PR updates its check status.
