@@ -23,7 +23,7 @@ class PermissionExpression:
         - viewer(o) = member(o) \ blocked(o)             Exclusion
 
     Composed via real Python operators instead of nested constructor
-    calls, mirroring `criteria-pattern`'s `Criteria`/`AndCriteria` composite:
+    calls — an operator-overloaded composite, not named factory methods:
 
         viewer = Reference(name="owner") | (
             Reference(name="member") - Reference(name="blocked")
