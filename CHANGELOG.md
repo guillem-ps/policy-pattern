@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v0.1.2 (2026-10-02)
+
+### Bug Fixes
+
+- **release**: Remove uv.lock sync step from release pipeline and add build command to
+  pyproject.toml
+  ([`5cc681b`](https://github.com/guillem-ps/policy-pattern/commit/5cc681bb22fa940b4dc6a34e3d7ad5376d191934))
+
+- **release**: Sync uv.lock with released version and auto-sync on future releases
+  ([`e1d8b6d`](https://github.com/guillem-ps/policy-pattern/commit/e1d8b6d05e7d2101d9210aa49dc0dd11b6b202c9))
+
+
 ## v0.1.1 (2026-10-02)
 
 ### Build System

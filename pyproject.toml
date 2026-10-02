@@ -1,6 +1,6 @@
 [project]
 name = "policy-pattern"
-version = "0.1.1"
+version = "0.1.2"
 description = "A minimal, embeddable ReBAC authorization engine for Python, inspired by Google Zanzibar."
 readme = "README.md"
 authors = [
@@ -183,6 +183,7 @@ unsound-return-statement = "error"
 [tool.semantic_release]
 allow_zero_version = true
 major_on_zero = true
+build_command = "pip install -q uv && uv lock"
 commit_message = "chore(release): {version}"
 commit_parser = "conventional"
 no_git_verify = true
