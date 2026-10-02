@@ -183,6 +183,7 @@ unsound-return-statement = "error"
 [tool.semantic_release]
 allow_zero_version = true
 major_on_zero = true
+build_command = "pip install -q uv && uv lock"
 commit_message = "chore(release): {version}"
 commit_parser = "conventional"
 no_git_verify = true
