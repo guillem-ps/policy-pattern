@@ -1,6 +1,6 @@
 [project]
 name = "policy-pattern"
-version = "0.1.1"
+version = "0.1.2"
 description = "A minimal, embeddable ReBAC authorization engine for Python, inspired by Google Zanzibar."
 readme = "README.md"
 authors = [
