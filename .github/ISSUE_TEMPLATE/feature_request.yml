@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose a new capability or API for policy-pattern
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What can't you do today that this would let you do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API or behavior
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        See `docs/architecture.md`'s Scope section for what's already planned for v1/v1.x/v2 — your idea might already be there.

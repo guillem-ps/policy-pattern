@@ -16,6 +16,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
 ]
@@ -27,7 +28,7 @@ keywords = [
     "zanzibar",
     "security",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.urls]
@@ -49,12 +50,14 @@ coverage = ["coverage[toml]>=7.0.0"]
 develop = ["pre-commit>=4.0.0"]
 format = ["ruff>=0.16.7"]
 lint = ["ruff>=0.16.7", "ty>=0.0.80", { include-group = "test" }]
+release = ["python-semantic-release>=9.15.0"]
 test = ["pytest>=9.1.1", "testcontainers>=4.15.0", { include-group = "coverage" }]
 all = [
     { include-group = "coverage" },
     { include-group = "develop" },
     { include-group = "format" },
     { include-group = "lint" },
+    { include-group = "release" },
     { include-group = "test" },
 ]
 # uv installs the "dev" group automatically on a bare `uv sync` (no
@@ -75,3 +78,121 @@ markers = [
     "integration: real PostgreSQL via testcontainers",
 ]
 xfail_strict = true
+
+[tool.coverage.run]
+source = ["policy_pattern"]
+parallel = true
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@overload",
+    "@typing.overload",
+    "typing.assert_never",
+    "assert_never",
+]
+omit = ["*mother.py"]
+
+[tool.coverage.paths]
+source = ["policy_pattern"]
+
+[tool.ruff]
+indent-width = 4
+line-length = 120
+target-version = "py312"
+output-format = "grouped"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 120
+indent-style = "space"
+quote-style = "double"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+select = [
+    "ANN",  # flake8-annotations
+    "F",    # pyflakes
+    "S",    # flake8-bandit
+    "B",    # flake8-bugbear
+    "DTZ",  # flake8-datetimez
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "C90",  # mccabe
+    "N",    # pep8-naming
+    "PERF", # perflint
+    "PYI",  # flake8-pyi
+    "E",    # pycodestyle
+    "W",    # pycodestyle
+    "D",    # pydocstyle
+    "UP",   # pyupgrade
+    "RUF",  # ruff
+]
+ignore = [
+    "UP035",  # Checks for uses of deprecated imports based on the minimum supported Python version.
+    "UP036",  # Checks for conditional blocks gated on sys.version_info comparisons that are outdated for the minimum supported Python version.
+    "E111",   # Checks for indentation with a non-multiple of 4 spaces.
+    "E114",   # Checks for indentation of comments with a non-multiple of 4 spaces.
+    "E117",   # Checks for over-indented code.
+    "W191",   # Checks for indentation that uses tabs.
+    "D200",   # Checks for single-line docstrings that are broken across multiple lines.
+    "D205",   # 1 blank line required between summary line and description.
+    "D206",   # Checks for docstrings that are indented with tabs.
+    "D212",   # Checks for docstring summary lines that are not positioned on the first physical line of the docstring.
+    "D401",   # First line of docstring should be in imperative mood.
+    "D300",   # Checks for docstrings that use '''triple single quotes''' instead of "triple double quotes".
+    "RUF100", # Checks for unused noqa directives.
+    "RUF043", # Checks for containing groups in patterns in match= statements.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "F401", # Checks for unused imports.
+    "D104", # Checks for undocumented public package definitions.
+]
+"**test**.py" = [
+    "S101", # Use of `assert` detected.
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+known-first-party = ["policy_pattern"]
+combine-as-imports = true
+
+[tool.ty.rules]
+missing-override-decorator = "error"
+missing-type-argument = "error"
+possibly-unresolved-reference = "warn"
+unsound-return-statement = "error"
+
+[tool.semantic_release]
+allow_zero_version = true
+major_on_zero = true
+commit_message = "chore(release): {version}"
+commit_parser = "conventional"
+no_git_verify = true
+tag_format = "v{version}"
+version_toml = ["pyproject.toml:project.version"]
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf", "build"]
+allowed_tags = ["feat", "fix", "perf", "build", "docs", "test", "refactor", "ci", "chore"]
+default_bump_level = 0
+parse_squash_commits = false
+ignore_merge_commits = true

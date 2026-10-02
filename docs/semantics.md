@@ -7,12 +7,11 @@ adapter's Python interface. Every adapter (`MemoryTupleStore`,
 `PostgresTupleStore`, and any future one) must satisfy the contract below,
 verified by a shared contract test suite that runs against all of them.
 
-This document currently covers **storage semantics** only — mutations,
-reads, and consistency. Evaluation semantics (union, intersection,
-exclusion, tuple-to-userset, recursion, cycle handling) and public API
-semantics (`check()`'s exact error contract) get their own sections once the
-evaluator design is settled; this is not an oversight, the evaluator has not
-been designed yet.
+This document covers **storage semantics** only — mutations, reads, and
+consistency. Evaluation semantics (union, intersection, exclusion,
+tuple-to-userset, recursion, cycle handling) and public API semantics
+(`check()`'s exact error contract) live in `docs/architecture.md` instead —
+deliberately not duplicated here.
 
 A note on scope: this document states *what must be true*. It deliberately
 avoids naming how a specific adapter achieves it (e.g. which PostgreSQL
@@ -57,7 +56,10 @@ so no adapter is more permissive than another:
 - non-empty,
 - a bounded maximum length (an exact shared constant, not "whatever the
   database column allows"),
-- restricted to a safe character set that excludes control characters.
+- restricted to a safe character set that excludes control characters,
+- no leading or trailing whitespace (accidental padding, not meaningful
+  content — a caller who genuinely needs a boundary space is almost
+  certainly passing in a copy-paste artifact, not an intentional id).
 
 The exact numeric bound is an implementation constant `policy-pattern`
 defines once and every adapter enforces identically — not something each
@@ -66,23 +68,24 @@ adapter chooses independently.
 ### Identifier content vs. canonical serialization
 
 **Identifier *content* is not restricted to exclude `:`, `#`, or `@`.**
-A real-world `id` — an email address (`guillem@example.com`), a UUID, a
+A real-world `id` — an email address (`john@example.com`), a UUID, a
 path — may legitimately contain any of these characters, and requiring
 callers to pre-encode such values before they can name a `user` would be
 the library imposing friction that its own structural-equality design was
 supposed to avoid.
 
-The **structured** form (`Object(type="user", id="guillem@example.com")`)
+The **structured** form (`Object(type="user", id="john@example.com")`)
 is authoritative and has no ambiguity — it is Python objects, not a string
 to scan. Ambiguity only appears in the **canonical textual serialization**
-(`user:guillem@example.com` / `document:42#owner@user:guillem`), where
+(`user:john@example.com` / `document:42#owner@user:john`), where
 `:`, `#`, and `@` are structural separators and therefore need an escaping
 or encoding rule when they also appear inside a component's content.
 
 ```text
 Identifier semantics (this section):
     id/type/relation content — effectively unrestricted, bounded only by
-    length and control-character exclusion above.
+    length, control-character exclusion, and no leading/trailing
+    whitespace, above.
 
 Canonical textual serialization (separate, not yet specified):
     a grammar + escaping scheme that can round-trip any valid identifier
@@ -249,7 +252,7 @@ There is deliberately **no subject-keyed query** ("find all tuples for this
 subject") in v1. Forward evaluation never needs it — it always starts from
 the queried object and walks relations outward, never the reverse. A
 subject-keyed query is what reverse lookup / `ListObjects` ("which documents
-can Guillem view?") needs, and that is explicitly out of scope for v1. Don't
+can John view?") needs, and that is explicitly out of scope for v1. Don't
 add it just because it looks symmetric with `(object, relation)` lookup;
 add it only when `ListObjects` is actually being designed.
 
@@ -323,16 +326,17 @@ must not be able to collapse "budget exhausted" into "relation has no
 further members" — that distinction has to survive all the way up through
 union, intersection, exclusion, and tuple-to-userset.
 
-### `read_tuples(...)` result shape
+### `read_relation(...)` result shape
 
-Returns a **set** — never duplicates. Ordering is unspecified. Filtering is
-exact match on the requested fields; no partial or fuzzy matching.
+Returns a **set** (a `frozenset`, per `ReadResult.tuples`) — never
+duplicates. Ordering is unspecified. Filtering is exact match on the
+requested fields; no partial or fuzzy matching.
 
 Subject usersets (e.g. `group:eng#member` as a subject) are returned exactly
-as stored — `read_tuples` does not resolve or expand them. Resolution is the
-evaluator's job, not storage's.
+as stored — `read_relation` does not resolve or expand them. Resolution is
+the evaluator's job, not storage's.
 
-A single logical `read_tuples()` call must reflect **one** consistent store
+A single logical `read_relation()` call must reflect **one** consistent store
 state, even if an adapter implements it internally via multiple statements
 or pages. If a read can't be answered from one consistent state, it must
 fail rather than silently blend two states — the same principle as
@@ -385,7 +389,7 @@ lifetime of a `check()`.
 ### The port must expose an evaluation-scoped view
 
 Snapshot consistency across *multiple reads* cannot be a property `check()`
-gets for free — each individual `read_tuples()` call being internally
+gets for free — each individual `read_relation()` call being internally
 consistent (see above) says nothing about two separate calls agreeing with
 each other. If the evaluator makes ten reads while resolving one `check()`,
 the port needs a way to say "these ten belong to the same view." Naming a
@@ -499,9 +503,6 @@ which reproduces the exact snapshot-drift bug the view exists to prevent.
 > stable for its lifetime" is part of the contract — the copy-based
 > mechanism is one way to get there, not the requirement itself.
 
-<!-- ponytail: full copy per evaluation scope, not fine-grained MVCC —
-     correct is more important than fast for a memory adapter used in
-     tests/demos. Real concurrent throughput is PostgresTupleStore's job. -->
 
 ## Explicit non-goals (v1)
 

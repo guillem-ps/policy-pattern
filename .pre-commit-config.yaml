@@ -42,6 +42,23 @@ repos:
         stages:
           - pre-commit
 
+  # The `(?!<)` lookahead exempts the placeholder form
+  # `NEEDS CLARIFICATION: <question>`, so AGENTS.md can document the
+  # convention without the hook rejecting its own definition. A real marker
+  # names a real question and never opens with `<`.
+  - repo: local
+    hooks:
+      - id: no-unresolved-clarifications
+        name: ❓ Unresolved Clarification Checker
+        entry: 'NEEDS CLARIFICATION:(?!\s*<)'
+        language: pygrep
+        types: [text]
+        # This file is excluded because the hook's own `entry` must contain
+        # the literal it searches for — no lookahead can exempt that.
+        exclude: '^(requirements(_dev)?\.txt|uv\.lock|\.pre-commit-config\.yaml)$'
+        stages:
+          - pre-commit
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # v0.16.7
     hooks:

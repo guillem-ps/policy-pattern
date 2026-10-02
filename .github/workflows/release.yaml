@@ -1,0 +1,42 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/policy-pattern
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@3e4afdf19396fbb50459a01ddf918b8bceff673e # v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+        if: steps.release.outputs.released == 'true'
+
+      - name: Build distributions
+        if: steps.release.outputs.released == 'true'
+        run: uv build
+
+      - name: Publish to PyPI
+        if: steps.release.outputs.released == 'true'
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1

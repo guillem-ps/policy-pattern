@@ -1,0 +1,27 @@
+name: Lint Pipeline
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: ruff format --check
+        run: uv run ruff format --check
+      - name: ruff check
+        run: uv run ruff check
+      - name: ty check
+        run: uv run ty check

@@ -1,0 +1,32 @@
+name: Code Quality Pipeline
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: "0 0 * * 1" # Every Monday at 00:00 UTC
+
+permissions:
+  security-events: write
+  contents: read
+  actions: read
+
+jobs:
+  analyze:
+    name: CodeQL analysis (python)
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@87ef0dc97def48aa960fbf026a2563ee9dbdb470 # v3
+        with:
+          languages: python
+          queries: security-extended, security-and-quality
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@87ef0dc97def48aa960fbf026a2563ee9dbdb470 # v3
+        with:
+          category: "/language:python"
+          upload: never

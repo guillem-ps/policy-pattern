@@ -1,0 +1,48 @@
+name: Test Pipeline
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - name: Install dependencies
+        run: uv sync --locked --python ${{ matrix.python-version }}
+      - name: Run tests
+        run: uv run --python ${{ matrix.python-version }} pytest
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Run tests with coverage
+        run: |
+          uv run coverage run -m pytest
+          uv run coverage combine
+          uv run coverage xml
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
