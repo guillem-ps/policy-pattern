@@ -27,12 +27,23 @@ jobs:
 
       - name: Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@3e4afdf19396fbb50459a01ddf918b8bceff673e # v9
+        uses: python-semantic-release/python-semantic-release@21ed7fa03e4a17ac49406eff4b60d5ad050fbdc2 # v9
         with:
           github_token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
         if: steps.release.outputs.released == 'true'
+
+      - name: Sync uv.lock with the released version
+        if: steps.release.outputs.released == 'true'
+        run: |
+          uv lock
+          if ! git diff --quiet -- uv.lock; then
+            git add uv.lock
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: sync uv.lock with released version"
+            git push
+          fi
 
       - name: Build distributions
         if: steps.release.outputs.released == 'true'
