@@ -23,12 +23,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@3e4afdf19396fbb50459a01ddf918b8bceff673e # v9
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.RELEASE_TOKEN }}
 
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
         if: steps.release.outputs.released == 'true'
