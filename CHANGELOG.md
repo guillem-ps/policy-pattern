@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-10-02)
+
+### Build System
+
+- **deps**: Bump actions/checkout from 4.4.0 to 7.0.1
+  ([`d72cc3b`](https://github.com/guillem-ps/policy-pattern/commit/d72cc3b92b6769d8a670168d094474e20a5ce73e))
+
+Bumps [actions/checkout](https://github.com/actions/checkout) from 4.4.0 to 7.0.1. - [Release
+  notes](https://github.com/actions/checkout/releases) -
+  [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md) -
+  [Commits](https://github.com/actions/checkout/compare/11d5960a326750d5838078e36cf38b85af677262...3d3c42e5aac5ba805825da76410c181273ba90b1)
+
+--- updated-dependencies: - dependency-name: actions/checkout dependency-version: 7.0.1
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+
 ## v0.1.0 (2026-10-02)
 
 ### Bug Fixes
