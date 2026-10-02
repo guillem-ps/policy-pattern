@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-10-02)
+
+### Bug Fixes
+
+- **release**: Sync uv.lock to 0.1.2, remove dead build_command
+  ([`75d5229`](https://github.com/guillem-ps/policy-pattern/commit/75d5229fe099f628519692e37f5360fb0087f377))
+
+build_command ran (confirmed in CI logs: "Updated policy-pattern v0.1.1 -> v0.1.2") but
+  semantic-release never stages its output into its own commit — only version_toml-listed files get
+  committed. The line was a no-op; removed. The release.yaml sync step added in 52c7561 is what
+  actually fixes this going forward.
+
+### Features
+
+- **release**: Add step to sync uv.lock with released version
+  ([`52c7561`](https://github.com/guillem-ps/policy-pattern/commit/52c75612402ede63db508cd245a0432e0a40c9b5))
+
+
 ## v0.1.2 (2026-10-02)
 
 ### Bug Fixes
@@ -11,6 +29,22 @@
 
 - **release**: Sync uv.lock with released version and auto-sync on future releases
   ([`e1d8b6d`](https://github.com/guillem-ps/policy-pattern/commit/e1d8b6d05e7d2101d9210aa49dc0dd11b6b202c9))
+
+### Build System
+
+- **deps**: Batch GitHub Actions dependency bumps
+  ([`eaf1964`](https://github.com/guillem-ps/policy-pattern/commit/eaf1964befce43d733c94da16cacdf60cf48550b))
+
+Combines 4 dependabot PRs into one merge to avoid 4 separate semantic-release patch bumps for what's
+  the same kind of change:
+
+- github/codeql-action/init, analyze: v3 -> v3.38.2 (#10, #13) - codecov/codecov-action: v4.6.0 ->
+  v7.1.1 (#3) - python-semantic-release/python-semantic-release: v9 -> v9.21.2 (#14)
+
+All SHA-pinned per the repo's Actions security policy; comments updated to match. No breaking input
+  changes for how this repo uses any of the three actions (verified: codecov's files/token/
+  fail_ci_if_error inputs unchanged; checkout already at v7 separately via #12; codeql-action and
+  python-semantic-release are patch bumps within the same major).
 
 
 ## v0.1.1 (2026-10-02)
