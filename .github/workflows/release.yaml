@@ -43,14 +43,18 @@ jobs:
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
         if: steps.release.outputs.released == 'true'
 
-      - name: Sync uv.lock with the released version
+      - name: Sync uv.lock and CITATION.cff with the released version
         if: steps.release.outputs.released == 'true'
         run: |
           uv lock
-          if ! git diff --quiet -- uv.lock; then
-            git add uv.lock
+          # version_variables only stamps CITATION.cff's `version:` field —
+          # date-released isn't a version string, so it never gets touched
+          # by semantic-release itself. Stamp it here instead.
+          sed -i "s/^date-released: .*/date-released: \"$(date -u +%F)\"/" CITATION.cff
+          if ! git diff --quiet -- uv.lock CITATION.cff; then
+            git add uv.lock CITATION.cff
             git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "chore: sync uv.lock with released version"
+              commit -m "chore: sync uv.lock and CITATION.cff date with released version"
             git push
           fi
 

@@ -188,6 +188,7 @@ commit_parser = "conventional"
 no_git_verify = true
 tag_format = "v{version}"
 version_toml = ["pyproject.toml:project.version"]
+version_variables = ["CITATION.cff:version"]
 
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
