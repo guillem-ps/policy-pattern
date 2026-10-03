@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.2.1 (2026-10-03)
+
+### Bug Fixes
+
+- **release**: Restore .git ownership before syncing uv.lock, resync to 0.2.0
+  ([`5021509`](https://github.com/guillem-ps/policy-pattern/commit/50215090f919b40c0a5d04ca6d75c3496eded09f))
+
+semantic-release's Docker container runs as root and commits/tags there, leaving .git owned by root.
+  The next step (git commit for uv.lock) then fails: "fatal: could not open '.git/COMMIT_EDITMSG':
+  Permission denied". Chown .git back to the runner user first.
+
+Also resyncs uv.lock to the already-released 0.2.0 to unblock CI now.
+
+### Continuous Integration
+
+- **dependabot**: Group codeql-action updates, drop the useless uv ecosystem
+  ([`baa761b`](https://github.com/guillem-ps/policy-pattern/commit/baa761b2b406e57b5fb9bd8b17f48a3a44d97fa4))
+
+
 ## v0.2.0 (2026-10-02)
 
 ### Bug Fixes
