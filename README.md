@@ -12,8 +12,8 @@
     <a href="https://codecov.io/gh/guillem-ps/policy-pattern" target="_blank">
         <img src="https://codecov.io/gh/guillem-ps/policy-pattern/graph/badge.svg" alt="Coverage Pipeline">
     </a>
-    <a href="pyproject.toml" target="_blank">
-        <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Package Version">
+    <a href="https://github.com/guillem-ps/policy-pattern/releases" target="_blank">
+        <img src="https://img.shields.io/github/v/release/guillem-ps/policy-pattern?color=blue" alt="Package Version">
     </a>
     <a href="pyproject.toml" target="_blank">
         <img src="https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue" alt="Supported Python Versions">
