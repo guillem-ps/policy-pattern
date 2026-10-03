@@ -3,9 +3,10 @@
 ## Project status
 
 `policy-pattern` is published to [PyPI](https://pypi.org/project/policy-pattern/)
-and versioned via semantic releases (currently pre-`1.0`). No deployed
-consumer is confirmed yet, but the package is installable and this
-policy applies to every published version, not just a future one.
+and versioned via semantic releases (currently pre-`1.0`). It's
+publicly installable regardless of whether a deployed consumer is
+confirmed, so this policy covers every version already shipped, not
+only ones still to come.
 
 ## Scope
 
