@@ -1,9 +1,26 @@
 # CHANGELOG
 
 
+## v0.2.2 (2026-10-03)
+
+### Chores
+
+- Sync uv.lock with released version
+  ([`b693fde`](https://github.com/guillem-ps/policy-pattern/commit/b693fde9fc33cfeb9bafa54555a11f7c67844232))
+
+
 ## v0.2.1 (2026-10-03)
 
 ### Bug Fixes
+
+- **.gitignore**: Add requirements files and notes directory to exclusion list
+  ([`5216028`](https://github.com/guillem-ps/policy-pattern/commit/52160288fd0dfc61b3ac756daa69653ea2facb2e))
+
+- **dependabot**: Untrack requirements exports so uv.lock updates work
+  ([`003b60d`](https://github.com/guillem-ps/policy-pattern/commit/003b60dae87c66ac38fab3812cbd56e67bfa9041))
+
+- **docs**: Update version badge link in README.md
+  ([`d534d66`](https://github.com/guillem-ps/policy-pattern/commit/d534d66bfa3c72399256e939a9713f3ce5aeadef))
 
 - **release**: Restore .git ownership before syncing uv.lock, resync to 0.2.0
   ([`5021509`](https://github.com/guillem-ps/policy-pattern/commit/50215090f919b40c0a5d04ca6d75c3496eded09f))
