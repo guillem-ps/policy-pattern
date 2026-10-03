@@ -2,10 +2,10 @@
 
 ## Project status
 
-`policy-pattern` is currently in the design/specification phase —
-there is no released package and no deployed consumer yet. There is no
-CVE surface yet, but this policy applies from the first line of code
-onward, not retroactively.
+`policy-pattern` is published to [PyPI](https://pypi.org/project/policy-pattern/)
+and versioned via semantic releases (currently pre-`1.0`). No deployed
+consumer is confirmed yet, but the package is installable and this
+policy applies to every published version, not just a future one.
 
 ## Scope
 
@@ -44,6 +44,7 @@ plan communicated back to the reporter before any public disclosure.
 
 ## Supported versions
 
-No versioned releases exist yet. Once the package is published to
-PyPI with semantic versioning, this section will list which lines
-receive security fixes.
+Pre-`1.0`: only the latest published release on PyPI is supported. A
+reported vulnerability is fixed in a new release, not backported to an
+older `0.x` line. This section will list explicit supported lines once
+`1.0` ships.
