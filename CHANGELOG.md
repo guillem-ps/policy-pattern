@@ -1,6 +1,55 @@
 # CHANGELOG
 
 
+## v0.2.3 (2026-10-03)
+
+### Build System
+
+- **release**: Auto-sync CITATION.cff version on every release
+  ([`1b71f24`](https://github.com/guillem-ps/policy-pattern/commit/1b71f24d1d6e81057d68d16d2778f65629292039))
+
+Added it manually in the previous commit alongside the SECURITY.md fix, but hand-editing it means it
+  goes stale again the next release — same class of bug this PR exists to fix.
+
+version_variables regex-replaces CITATION.cff's `version:` line on every semantic-release run, same
+  mechanism as version_toml for pyproject.toml. Verified against the installed engine directly: it
+  matches `version: x.y.z` but correctly skips `cff-version: 1.2.0` (negative lookbehind excludes
+  the hyphen-prefixed variant).
+
+date-released isn't covered by version_variables (version-string only) — stays manually maintained
+  for now.
+
+- **release**: Stamp CITATION.cff's date-released on every release
+  ([`4a51120`](https://github.com/guillem-ps/policy-pattern/commit/4a51120498a7f0785fe1ae5bed1b85f2fd806b86))
+
+version_variables only touches the `version:` field — it matches a semver pattern, date-released
+  isn't one, so it would've gone stale again on the very next release regardless of how often they
+  happen.
+
+Extended the existing uv.lock sync step to also sed-replace date-released with the current UTC date
+  and bundle both files into the same post-release commit.
+
+### Chores
+
+- Sync uv.lock with released version
+  ([`3fff949`](https://github.com/guillem-ps/policy-pattern/commit/3fff94928de0c6fc3577693c891c354d24ca6859))
+
+### Documentation
+
+- Clarify project status in SECURITY.md
+  ([`5269223`](https://github.com/guillem-ps/policy-pattern/commit/52692237e0edd89c51dc680510435654f9c59afa))
+
+- Fix stale pre-release claims in SECURITY.md and CITATION.cff
+  ([`6685b6b`](https://github.com/guillem-ps/policy-pattern/commit/6685b6bfa38118050818c4d036f3c556cac28775))
+
+Both files were written before the first release and still said so — SECURITY.md claimed "no
+  released package and no deployed consumer yet", CITATION.cff omitted version/date-released "not
+  released yet". Neither is true anymore: policy-pattern is on PyPI at 0.2.2.
+
+Updated SECURITY.md's project status and supported-versions sections to reflect an actual pre-1.0
+  release policy, and added version/date-released/repository-artifact to CITATION.cff.
+
+
 ## v0.2.2 (2026-10-03)
 
 ### Chores
