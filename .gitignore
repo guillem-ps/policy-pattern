@@ -15,6 +15,13 @@ index.txt
 ## Python version file:
 .python-version
 
+## Generated uv exports — regenerate with `uv export` if ever needed
+requirements.txt
+requirements_dev.txt
+
+## Note directory
+**.notes**
+
 ################### Folders to exclude ###################
 # all IDE folders
 **vscode**
