@@ -201,11 +201,14 @@ Where a given kind of change lands, and what else it forces you to touch:
   just discouraged.
 - Large files (>100KB), case conflicts, malformed TOML/YAML also
   rejected at commit time.
-- `requirements.txt` / `requirements_dev.txt` are regenerated from
-  `uv.lock` automatically (`uv export`) whenever `pyproject.toml` or
-  `uv.lock` changes. They are a **generated export for tooling that
-  doesn't speak `uv`** — `pyproject.toml` + `uv.lock` remain the actual
-  source of truth. Never hand-edit the requirements files.
+- `pyproject.toml` + `uv.lock` are the only dependency source of truth —
+  no `requirements.txt` / `requirements_dev.txt` export is tracked.
+  Those files used to be generated for tooling that doesn't speak `uv`,
+  but Dependabot's `uv` ecosystem treats any tracked `.txt`/`.in` file as
+  an independent pip-style manifest and was bumping pins there directly
+  instead of resolving through `uv.lock` — removed to stop that drift.
+  Run `uv export -o requirements.txt` by hand if a one-off export is
+  ever needed; don't commit the result.
 
 Install once: `uv run pre-commit install -t pre-commit -t commit-msg`
 
