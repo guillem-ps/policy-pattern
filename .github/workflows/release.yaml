@@ -40,7 +40,7 @@ jobs:
         if: steps.release.outputs.released == 'true'
         run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/.git"
 
-      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
         if: steps.release.outputs.released == 'true'
 
       - name: Sync uv.lock and CITATION.cff with the released version
