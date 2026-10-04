@@ -8,7 +8,7 @@ authors:
     family-names: Pozo Sebastián
 repository-code: https://github.com/guillem-ps/policy-pattern
 repository-artifact: https://pypi.org/project/policy-pattern/
-version: 0.2.3
+version: 0.2.4
 date-released: "2026-10-03"
 abstract: >
   policy-pattern is a minimal, embeddable ReBAC (relationship-based
