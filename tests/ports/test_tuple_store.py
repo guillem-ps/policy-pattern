@@ -81,7 +81,7 @@ def test_tuple_store_cannot_be_instantiated_directly() -> None:
     Test that TupleStore cannot be instantiated directly — it is an ABC.
     """
     with raises(TypeError):
-        TupleStore()
+        TupleStore()  # ty: ignore[call-non-callable]
 
 
 def test_view_cannot_be_instantiated_directly() -> None:
@@ -89,7 +89,7 @@ def test_view_cannot_be_instantiated_directly() -> None:
     Test that View cannot be instantiated directly — it is an ABC.
     """
     with raises(TypeError):
-        View()
+        View()  # ty: ignore[call-non-callable]
 
 
 def test_delete_tuples_calls_write_tuples_with_deletion_only_mutation() -> None:
