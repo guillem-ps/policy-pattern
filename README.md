@@ -52,7 +52,27 @@ See [Architecture § Scope](docs/architecture.md#scope) for what's planned (v1.x
 ## Example
 
 ```python
+from policy_pattern.adapters.memory import MemoryTupleStore
+from policy_pattern.evaluator import Evaluator
+from policy_pattern.models import (
+    DirectSubject,
+    Model,
+    Mutation,
+    ObjectReference,
+    Reference,
+    Relation,
+    Tuple,
+    TupleToUserset,
+    Type,
+    Union,
+)
+
 model = Model()
+model.types["folder"] = Type(
+    name="folder",
+    relations={"owner": Relation(allowed_subject_types=("user",))},
+    permissions={"viewer": Reference(name="owner")},
+)
 model.types["document"] = Type(
     name="document",
     relations={
@@ -65,8 +85,25 @@ model.types["document"] = Type(
 )
 compiled = model.compile()
 
+store = MemoryTupleStore()
+alice = DirectSubject(object=ObjectReference(type="user", id="alice"))
+engineering = ObjectReference(type="folder", id="engineering")
+document_42 = ObjectReference(type="document", id="42")
+
+store.write_tuples(
+    Mutation(
+        additions=frozenset(
+            {
+                Tuple(subject=alice, relation="owner", object=engineering),
+                Tuple(subject=DirectSubject(object=engineering), relation="parent", object=document_42),
+            }
+        ),
+        deletions=frozenset(),
+    )
+)
+
 evaluator = Evaluator(model=compiled, store=store)
-evaluator.check(alice, "viewer", document_42)
+evaluator.check(alice, "viewer", document_42)  # True — alice owns the parent folder
 ```
 
 `viewer` here means "the document's own owner, or the owner of whatever folder it lives in" — a document under
