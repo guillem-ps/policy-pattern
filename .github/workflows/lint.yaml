@@ -18,10 +18,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --only-group lint
       - name: ruff format --check
         run: uv run ruff format --check
       - name: ruff check
         run: uv run ruff check
       - name: ty check
-        run: uv run ty check
+        run: uv run ty check policy_pattern

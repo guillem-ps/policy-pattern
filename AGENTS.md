@@ -94,12 +94,16 @@ Local verification loop:
 ```bash
 uv run ruff format
 uv run ruff check
-uv run ty check
+uv run ty check policy_pattern
 uv run pytest
 ```
 
+`ty check` is scoped to `policy_pattern/` so the lint environment never
+needs the PostgreSQL test drivers. `tests/` is not type-checked
+separately — `ruff`/`pytest` still cover it, `ty check` does not.
+
 Or the `Makefile` shortcuts: `make format`, `make lint` (`ruff check` +
-`ty check`), `make test`, `make coverage`.
+`ty check policy_pattern`), `make test`, `make coverage`.
 
 ## Testing Instructions
 

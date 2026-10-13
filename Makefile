@@ -19,8 +19,8 @@ coverage: # Run tests with coverage report, preserving the real pass/fail status
 	uv run coverage erase; \
 	exit $$status
 
-lint: # Type-check and lint
-	uv run ty check
+lint: # Type-check (library source only, no PostgreSQL drivers needed) and lint
+	uv run ty check policy_pattern
 	uv run ruff check
 
 format: # Format code
