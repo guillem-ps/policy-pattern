@@ -635,7 +635,7 @@ def test_union_short_circuits_right_branch() -> None:
 
     with store.snapshot() as view:
         context = EvaluationContext(view=view, budget=EvaluationBudget())
-        result = evaluator._check_permission(alice, expression, document, context)
+        result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is True
         assert (document, "editor") not in context.memo
@@ -677,7 +677,7 @@ def test_exclusion_always_evaluates_both_sides() -> None:
 
     with store.snapshot() as view:
         context = EvaluationContext(view=view, budget=EvaluationBudget())
-        result = evaluator._check_permission(alice, expression, document, context)
+        result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is False
         assert (document, "owner") in context.memo
@@ -758,7 +758,7 @@ def test_memoization_shared_across_relation_and_permission_paths() -> None:
 
     with store.snapshot() as view:
         context = EvaluationContext(view=view, budget=EvaluationBudget())
-        result = evaluator._check_permission(alice, expression, document, context)
+        result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is False
         assert context.node_count == 1
