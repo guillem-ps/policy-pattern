@@ -11,7 +11,7 @@ from subprocess import run
 from sys import executable
 from typing import override
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.adapters.memory import MemoryTupleStore
 from policy_pattern.errors import EvaluationError, UnknownNameError, UnknownTypeError
@@ -35,6 +35,7 @@ from policy_pattern.models import (
 from policy_pattern.ports import TupleStore, View
 
 
+@mark.unit
 def test_evaluation_budget_default_values() -> None:
     """
     Test that EvaluationBudget uses the documented defaults when constructed with no arguments.
@@ -45,6 +46,7 @@ def test_evaluation_budget_default_values() -> None:
     assert budget.max_store_reads == 1_000
 
 
+@mark.unit
 def test_evaluation_budget_equality() -> None:
     """
     Test that two EvaluationBudget instances with the same field values are equal.
@@ -54,6 +56,7 @@ def test_evaluation_budget_equality() -> None:
     )
 
 
+@mark.unit
 def test_evaluation_budget_inequality_different_max_depth() -> None:
     """
     Test that two EvaluationBudget instances with a different max_depth are not equal.
@@ -61,6 +64,7 @@ def test_evaluation_budget_inequality_different_max_depth() -> None:
     assert EvaluationBudget(max_depth=5) != EvaluationBudget(max_depth=6)
 
 
+@mark.unit
 def test_evaluation_budget_hash_consistency() -> None:
     """
     Test that equal EvaluationBudget instances have the same hash value.
@@ -68,6 +72,7 @@ def test_evaluation_budget_hash_consistency() -> None:
     assert hash(EvaluationBudget(max_depth=5)) == hash(EvaluationBudget(max_depth=5))
 
 
+@mark.unit
 def test_evaluation_budget_is_frozen() -> None:
     """
     Test that EvaluationBudget instances cannot be mutated after construction.
@@ -75,15 +80,16 @@ def test_evaluation_budget_is_frozen() -> None:
     budget = EvaluationBudget()
 
     with raises(FrozenInstanceError):
-        budget.max_depth = 1  # ty: ignore[invalid-assignment]
+        budget.max_depth = 1  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        budget.max_nodes = 1  # ty: ignore[invalid-assignment]
+        budget.max_nodes = 1  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        budget.max_store_reads = 1  # ty: ignore[invalid-assignment]
+        budget.max_store_reads = 1  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_evaluation_context_starts_empty() -> None:
     """
     Test that a fresh EvaluationContext has no visited/memo entries and zero counters.
@@ -98,6 +104,7 @@ def test_evaluation_context_starts_empty() -> None:
         assert context.store_read_count == 0
 
 
+@mark.unit
 def test_evaluation_context_is_mutable() -> None:
     """
     Test that EvaluationContext fields can be mutated in place — it is deliberately not frozen.
@@ -149,6 +156,7 @@ class _SnapshotCountingStore(TupleStore):
             yield view
 
 
+@mark.unit
 def test_check_direct_relation_exact_match() -> None:
     """
     Test that check() returns True for an exact stored tuple match on a bare Relation.
@@ -165,6 +173,7 @@ def test_check_direct_relation_exact_match() -> None:
     assert evaluator.check(alice, "member", group_a) is True
 
 
+@mark.unit
 def test_check_direct_relation_no_match() -> None:
     """
     Test that check() returns False when no tuple and no userset expansion matches.
@@ -176,6 +185,7 @@ def test_check_direct_relation_no_match() -> None:
     assert evaluator.check(_direct("alice"), "member", _group("a")) is False
 
 
+@mark.unit
 def test_check_relation_expands_userset() -> None:
     """
     Test that check() recursively follows a SubjectSet tuple to prove indirect membership.
@@ -205,6 +215,7 @@ def test_check_relation_expands_userset() -> None:
     assert evaluator.check(alice, "member", group_a) is True
 
 
+@mark.unit
 def test_check_relation_checking_a_subject_set_itself() -> None:
     """
     Test that check()'s subject argument can itself be a SubjectSet, not only a DirectSubject.
@@ -227,6 +238,7 @@ def test_check_relation_checking_a_subject_set_itself() -> None:
     assert evaluator.check(eng_members, "member", leads) is True
 
 
+@mark.unit
 def test_check_relation_ignores_tuple_with_disallowed_subject_type() -> None:
     """
     Test that check() never counts a stored tuple whose subject type isn't in Relation.allowed_subject_types.
@@ -251,6 +263,7 @@ def test_check_relation_ignores_tuple_with_disallowed_subject_type() -> None:
     assert evaluator.check(rogue_subject, "member", group_a) is False
 
 
+@mark.unit
 def test_check_relation_ignores_userset_expansion_with_disallowed_shape() -> None:
     """
     Test that check() never follows a SubjectSet whose "type#relation" shape isn't in allowed_subject_types.
@@ -292,6 +305,7 @@ def test_check_relation_ignores_userset_expansion_with_disallowed_shape() -> Non
     assert evaluator.check(alice, "owner", document_42) is False
 
 
+@mark.unit
 def test_check_relation_cycle_raises_evaluation_error() -> None:
     """
     Test that a mutual userset cycle (group:a#member -> group:b#member -> group:a#member) raises EvaluationError.
@@ -320,6 +334,7 @@ def test_check_relation_cycle_raises_evaluation_error() -> None:
 _EVALUATOR_DETERMINISM_PROBE: Path = Path(__file__).parent / "evaluator_determinism_probe.py"
 
 
+@mark.unit
 def test_check_relation_userset_expansion_order_is_deterministic_across_processes() -> None:
     """
     Test that check()'s userset-expansion order (and thus its verdict) is stable across PYTHONHASHSEED values.
@@ -351,6 +366,7 @@ def _chain_of_groups(length: int) -> list[ObjectReference]:
     return [_group(str(i)) for i in range(length)]
 
 
+@mark.unit
 def test_check_relation_max_depth_exceeded_raises() -> None:
     """
     Test that a userset chain deeper than max_depth raises EvaluationError.
@@ -370,6 +386,7 @@ def test_check_relation_max_depth_exceeded_raises() -> None:
         evaluator.check(_direct("alice"), "member", chain[0], budget=EvaluationBudget(max_depth=2))
 
 
+@mark.unit
 def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
     """
     Test that node_count exceeding max_nodes raises EvaluationError even without a truncated read.
@@ -393,6 +410,7 @@ def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
         evaluator.check(_direct("alice"), "member", chain[0], budget=EvaluationBudget(max_nodes=2, max_depth=100))
 
 
+@mark.unit
 def test_check_relation_enumeration_truncated_raises() -> None:
     """
     Test that a truncated userset enumeration always raises, even if none of the examined tuples matched.
@@ -416,6 +434,7 @@ def test_check_relation_enumeration_truncated_raises() -> None:
         evaluator.check(_direct("alice"), "member", root, budget=EvaluationBudget(max_nodes=2))
 
 
+@mark.unit
 def test_check_relation_max_store_reads_exceeded_raises() -> None:
     """
     Test that exceeding max_store_reads raises EvaluationError — the gap Decision 8 exists to close.
@@ -440,6 +459,7 @@ def test_check_relation_max_store_reads_exceeded_raises() -> None:
         )
 
 
+@mark.unit
 def test_check_degenerate_budget_raises_evaluation_error_not_something_else() -> None:
     """
     Test that a degenerate EvaluationBudget (max_nodes=0) fails cleanly with EvaluationError.
@@ -452,6 +472,7 @@ def test_check_degenerate_budget_raises_evaluation_error_not_something_else() ->
         evaluator.check(_direct("alice"), "member", _group("a"), budget=EvaluationBudget(max_nodes=0))
 
 
+@mark.unit
 def test_check_raises_unknown_type_error_for_undeclared_object_type() -> None:
     """
     Test that check() raises UnknownTypeError when object.type is not declared in the CompiledModel.
@@ -464,6 +485,7 @@ def test_check_raises_unknown_type_error_for_undeclared_object_type() -> None:
         evaluator.check(_direct("alice"), "member", ObjectReference(type="document", id="42"))
 
 
+@mark.unit
 def test_check_raises_unknown_type_error_via_userset_expansion() -> None:
     """
     Test that userset expansion into a SubjectSet with an undeclared object.type raises UnknownTypeError.
@@ -496,6 +518,7 @@ def test_check_raises_unknown_type_error_via_userset_expansion() -> None:
         evaluator.check(_direct("alice"), "member", group_a)
 
 
+@mark.unit
 def test_check_raises_unknown_name_error_for_undeclared_name() -> None:
     """
     Test that check() raises UnknownNameError (not a raw KeyError) for a name declared nowhere on the type.
@@ -508,6 +531,7 @@ def test_check_raises_unknown_name_error_for_undeclared_name() -> None:
         evaluator.check(_direct("alice"), "not_a_real_relation_or_permission", _group("a"))
 
 
+@mark.unit
 def test_check_opens_exactly_one_snapshot() -> None:
     """
     Test that check() opens exactly one store.snapshot(), even when internal evaluation issues multiple reads.
@@ -559,6 +583,7 @@ def _document_model() -> CompiledModel:
     )
 
 
+@mark.unit
 def test_check_permission_reference_dispatches_to_relation() -> None:
     """
     Test that a Reference permission resolves to the named relation.
@@ -575,6 +600,7 @@ def test_check_permission_reference_dispatches_to_relation() -> None:
     assert evaluator.check(alice, "viewer", document) is True
 
 
+@mark.unit
 def test_check_permission_union_true_via_either_branch() -> None:
     """
     Test that Union is True when either operand holds, False when neither does.
@@ -592,6 +618,7 @@ def test_check_permission_union_true_via_either_branch() -> None:
     assert evaluator.check(_direct("bob"), "viewer", document) is False
 
 
+@mark.unit
 def test_union_short_circuits_right_branch() -> None:
     """
     Test that Union's right branch is never memoized when the left branch alone decides True.
@@ -614,6 +641,7 @@ def test_union_short_circuits_right_branch() -> None:
         assert (document, "editor") not in context.memo
 
 
+@mark.unit
 def test_check_permission_intersection_requires_both() -> None:
     """
     Test that Intersection is True only when both operands hold.
@@ -635,6 +663,7 @@ def test_check_permission_intersection_requires_both() -> None:
     assert evaluator.check(alice, "manager", document) is True
 
 
+@mark.unit
 def test_exclusion_always_evaluates_both_sides() -> None:
     """
     Test that Exclusion evaluates both include and exclude, never short-circuiting either side.
@@ -655,6 +684,7 @@ def test_exclusion_always_evaluates_both_sides() -> None:
         assert (document, "blocked") in context.memo
 
 
+@mark.unit
 def test_exclusion_returns_true_when_only_include_holds() -> None:
     """
     Test that Exclusion allows when include holds and exclude does not — catches an include/exclude swap.
@@ -676,6 +706,7 @@ def test_exclusion_returns_true_when_only_include_holds() -> None:
     assert evaluator.check(alice, "restricted_viewer", document) is True
 
 
+@mark.unit
 def test_exclusion_propagates_error_from_exclude_side() -> None:
     """
     Test that an EvaluationError raised while evaluating `exclude` propagates, never swallowed into False.
@@ -704,6 +735,7 @@ def test_exclusion_propagates_error_from_exclude_side() -> None:
         evaluator.check(_direct("alice"), "restricted", _document("42"))
 
 
+@mark.unit
 def test_memoization_shared_across_relation_and_permission_paths() -> None:
     """
     Test that a second lookup of the same (object, name) hits the memo cache instead of recomputing.
@@ -732,6 +764,7 @@ def test_memoization_shared_across_relation_and_permission_paths() -> None:
         assert context.node_count == 1
 
 
+@mark.unit
 def test_check_permission_unknown_expression_type_raises() -> None:
     """
     Test that an unrecognized PermissionExpression subtype raises EvaluationError (exhaustiveness fallback).
@@ -774,6 +807,7 @@ def _folder_model() -> CompiledModel:
     )
 
 
+@mark.unit
 def test_check_tuple_to_userset_traverses_parent() -> None:
     """
     Test that TupleToUserset follows the tupleset relation to a related object and checks computed there.
@@ -799,6 +833,7 @@ def test_check_tuple_to_userset_traverses_parent() -> None:
     assert evaluator.check(alice, "inherited_viewer", child) is True
 
 
+@mark.unit
 def test_check_tuple_to_userset_ignores_subject_set_entries() -> None:
     """
     Test that a SubjectSet stored under the tupleset relation is skipped, not followed.
@@ -817,6 +852,7 @@ def test_check_tuple_to_userset_ignores_subject_set_entries() -> None:
     assert evaluator.check(_direct("alice"), "inherited_viewer", child) is False
 
 
+@mark.unit
 def test_check_tuple_to_userset_truncated_enumeration_raises() -> None:
     """
     Test that a truncated tupleset enumeration raises EvaluationError, not a silent False.

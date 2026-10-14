@@ -4,12 +4,13 @@ Test module for the tuple to userset model.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import InvalidIdentifierError
 from policy_pattern.models.tuple_to_userset import TupleToUserset
 
 
+@mark.unit
 def test_tuple_to_userset_valid_construction() -> None:
     """
     Test that a valid TupleToUserset can be constructed without raising an error.
@@ -22,6 +23,7 @@ def test_tuple_to_userset_valid_construction() -> None:
     assert tuple_to_userset.computed == "viewer"
 
 
+@mark.unit
 def test_tuple_to_userset_equality() -> None:
     """
     Test that two TupleToUserset instances with the same tupleset and computed are equal.
@@ -29,6 +31,7 @@ def test_tuple_to_userset_equality() -> None:
     assert TupleToUserset(tupleset="parent", computed="viewer") == TupleToUserset(tupleset="parent", computed="viewer")
 
 
+@mark.unit
 def test_tuple_to_userset_inequality_different_tupleset() -> None:
     """
     Test that two TupleToUserset instances with a different tupleset are not equal.
@@ -36,6 +39,7 @@ def test_tuple_to_userset_inequality_different_tupleset() -> None:
     assert TupleToUserset(tupleset="parent", computed="viewer") != TupleToUserset(tupleset="child", computed="viewer")
 
 
+@mark.unit
 def test_tuple_to_userset_inequality_different_computed() -> None:
     """
     Test that two TupleToUserset instances with a different computed are not equal.
@@ -43,6 +47,7 @@ def test_tuple_to_userset_inequality_different_computed() -> None:
     assert TupleToUserset(tupleset="parent", computed="viewer") != TupleToUserset(tupleset="parent", computed="editor")
 
 
+@mark.unit
 def test_tuple_to_userset_hash_consistency() -> None:
     """
     Test that the hash of two TupleToUserset instances with the same fields is equal.
@@ -52,6 +57,7 @@ def test_tuple_to_userset_hash_consistency() -> None:
     assert hash(tuple_to_userset1) == hash(tuple_to_userset2)
 
 
+@mark.unit
 def test_tuple_to_userset_is_frozen() -> None:
     """
     Test that TupleToUserset instances cannot be mutated after construction.
@@ -64,6 +70,7 @@ def test_tuple_to_userset_is_frozen() -> None:
         tuple_to_userset.computed = "editor"  # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_tuple_to_userset_invalid_tupleset_empty() -> None:
     """
     Test that an InvalidIdentifierError is raised when the tupleset is invalid.
@@ -72,6 +79,7 @@ def test_tuple_to_userset_invalid_tupleset_empty() -> None:
         TupleToUserset(tupleset="", computed="viewer")
 
 
+@mark.unit
 def test_tuple_to_userset_invalid_computed_empty() -> None:
     """
     Test that an InvalidIdentifierError is raised when the computed is invalid.

@@ -2,7 +2,7 @@
 Test module for the Model class.
 """
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import ModelValidationError
 from policy_pattern.models import (
@@ -19,6 +19,7 @@ from policy_pattern.models import (
 )
 
 
+@mark.unit
 def test_model_default_construction() -> None:
     """
     Test that a Model constructs with an empty types dict by default.
@@ -27,6 +28,7 @@ def test_model_default_construction() -> None:
     assert model.types == {}
 
 
+@mark.unit
 def test_model_types_is_mutable() -> None:
     """
     Test that `types` can be mutated after construction — Model is authoring-time, not frozen.
@@ -36,6 +38,7 @@ def test_model_types_is_mutable() -> None:
     assert "document" in model.types
 
 
+@mark.unit
 def test_model_equality() -> None:
     """
     Test that two Model instances with the same types are equal.
@@ -44,6 +47,7 @@ def test_model_equality() -> None:
     assert Model(types=dict(types)) == Model(types=dict(types))
 
 
+@mark.unit
 def test_model_inequality_different_types() -> None:
     """
     Test that two Model instances with different types are not equal.
@@ -53,6 +57,7 @@ def test_model_inequality_different_types() -> None:
     assert Model(types={"document": document}) != Model(types={"folder": folder})
 
 
+@mark.unit
 def test_model_not_hashable() -> None:
     """
     Test that Model is not hashable — it is mutable, so dataclass disables __hash__.
@@ -62,6 +67,7 @@ def test_model_not_hashable() -> None:
         hash(model)
 
 
+@mark.unit
 def test_model_compile_valid_returns_compiled_model() -> None:
     """
     Test that a valid Model compiles into a CompiledModel with matching content.
@@ -79,6 +85,7 @@ def test_model_compile_valid_returns_compiled_model() -> None:
     assert compiled.types["document"] is document
 
 
+@mark.unit
 def test_model_compile_mismatched_type_name_raises() -> None:
     """
     Test that a Type whose `name` disagrees with its key in `types` raises ModelValidationError.
@@ -97,6 +104,7 @@ def test_model_compile_mismatched_type_name_raises() -> None:
     assert exc_info.value.message == "model key 'document' does not match Type.name 'folder'"
 
 
+@mark.unit
 def test_model_compile_undeclared_reference_raises() -> None:
     """
     Test that a Reference to an undeclared name raises ModelValidationError.
@@ -114,6 +122,7 @@ def test_model_compile_undeclared_reference_raises() -> None:
     assert exc_info.value.message == "document.view references undeclared name 'missing'"
 
 
+@mark.unit
 def test_model_compile_tuple_to_userset_target_type_must_be_declared_raises() -> None:
     """
     Test that a tupleset relation's allowed_subject_types must name only declared Types.
@@ -135,6 +144,7 @@ def test_model_compile_tuple_to_userset_target_type_must_be_declared_raises() ->
     assert exc_info.value.message == "document.inherited_viewer tupleset 'parent' allows undeclared type 'folder'"
 
 
+@mark.unit
 def test_model_compile_tuple_to_userset_computed_must_exist_on_target_type_raises() -> None:
     """
     Test that TupleToUserset.computed must exist on every plain-type target the tupleset relation allows.
@@ -159,6 +169,7 @@ def test_model_compile_tuple_to_userset_computed_must_exist_on_target_type_raise
     )
 
 
+@mark.unit
 def test_model_compile_tuple_to_userset_ignores_userset_shaped_allowed_subject_type() -> None:
     """
     Test that a userset-shaped allowed_subject_types entry ("type#relation") is never validated as a traversal target.
@@ -181,6 +192,7 @@ def test_model_compile_tuple_to_userset_ignores_userset_shaped_allowed_subject_t
     assert "document" in compiled.types
 
 
+@mark.unit
 def test_model_compile_tupleset_must_be_relation_raises() -> None:
     """
     Test that a TupleToUserset whose tupleset resolves to a permission (not a relation) raises ModelValidationError.
@@ -204,6 +216,7 @@ def test_model_compile_tupleset_must_be_relation_raises() -> None:
     )
 
 
+@mark.unit
 def test_model_compile_valid_tuple_to_userset() -> None:
     """
     Test that a TupleToUserset whose tupleset resolves to a relation compiles without raising.
@@ -223,6 +236,7 @@ def test_model_compile_valid_tuple_to_userset() -> None:
     assert compiled.types["folder"] is folder
 
 
+@mark.unit
 def test_model_compile_recurses_into_union_and_intersection() -> None:
     """
     Test that compile() recurses into both operands of Union and Intersection.
@@ -245,6 +259,7 @@ def test_model_compile_recurses_into_union_and_intersection() -> None:
     assert compiled.types["document"] is document
 
 
+@mark.unit
 def test_model_compile_union_propagates_undeclared_right_operand() -> None:
     """
     Test that compile() validates the *right* operand of a Union, not only the left.
@@ -266,6 +281,7 @@ def test_model_compile_union_propagates_undeclared_right_operand() -> None:
     assert exc_info.value.message == "document.view references undeclared name 'missing'"
 
 
+@mark.unit
 def test_model_compile_exclusion_propagates_undeclared_exclude_operand() -> None:
     """
     Test that compile() validates both `include` and `exclude` operands of an Exclusion.
@@ -283,6 +299,7 @@ def test_model_compile_exclusion_propagates_undeclared_exclude_operand() -> None
     assert exc_info.value.message == "document.view references undeclared name 'missing'"
 
 
+@mark.unit
 def test_model_compile_unknown_expression_type_raises() -> None:
     """
     Test that an unrecognized PermissionExpression subtype hits the exhaustiveness fallback.
@@ -296,6 +313,7 @@ def test_model_compile_unknown_expression_type_raises() -> None:
     assert exc_info.value.message == "document.view contains unknown expression type 'PermissionExpression'"
 
 
+@mark.unit
 def test_model_compile_rejects_name_used_as_both_relation_and_permission() -> None:
     """
     Test that a name declared as both a relation and a permission on the same Type raises ModelValidationError.

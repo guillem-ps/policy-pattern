@@ -4,7 +4,7 @@ Test module for the Tuple class.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import InvalidIdentifierError
 from policy_pattern.models import DirectSubject, ObjectReference, Tuple
@@ -24,6 +24,7 @@ def _object(id_: str = "42") -> ObjectReference:
     return ObjectReference(type="document", id=id_)
 
 
+@mark.unit
 def test_tuple_valid_construction() -> None:
     """
     Test that a valid Tuple can be constructed without raising an error.
@@ -34,6 +35,7 @@ def test_tuple_valid_construction() -> None:
     assert tuple_.object == _object()
 
 
+@mark.unit
 def test_tuple_invalid_relation_empty() -> None:
     """
     Test that an InvalidIdentifierError is raised when relation is invalid.
@@ -42,6 +44,7 @@ def test_tuple_invalid_relation_empty() -> None:
         Tuple(subject=_direct_subject(), relation="", object=_object())
 
 
+@mark.unit
 def test_tuple_invalid_object_type_empty() -> None:
     """
     Test that an InvalidIdentifierError is raised when the object's type is invalid.
@@ -50,6 +53,7 @@ def test_tuple_invalid_object_type_empty() -> None:
         Tuple(subject=_direct_subject(), relation="owner", object=ObjectReference(type="", id="42"))
 
 
+@mark.unit
 def test_tuple_equality() -> None:
     """
     Test that two Tuple instances with the same subject, relation and object are equal.
@@ -59,6 +63,7 @@ def test_tuple_equality() -> None:
     )
 
 
+@mark.unit
 def test_tuple_inequality_different_subject() -> None:
     """
     Test that two Tuple instances with a different subject are not equal.
@@ -68,6 +73,7 @@ def test_tuple_inequality_different_subject() -> None:
     )
 
 
+@mark.unit
 def test_tuple_inequality_different_relation() -> None:
     """
     Test that two Tuple instances with a different relation are not equal.
@@ -77,6 +83,7 @@ def test_tuple_inequality_different_relation() -> None:
     )
 
 
+@mark.unit
 def test_tuple_inequality_different_object() -> None:
     """
     Test that two Tuple instances with a different object are not equal.
@@ -86,6 +93,7 @@ def test_tuple_inequality_different_object() -> None:
     )
 
 
+@mark.unit
 def test_tuple_hash_consistency() -> None:
     """
     Test that equal Tuple instances have the same hash value.
@@ -95,6 +103,7 @@ def test_tuple_hash_consistency() -> None:
     )
 
 
+@mark.unit
 def test_tuple_is_frozen() -> None:
     """
     Test that Tuple instances cannot be mutated after construction.
@@ -102,10 +111,10 @@ def test_tuple_is_frozen() -> None:
     tuple_ = Tuple(subject=_direct_subject(), relation="owner", object=_object())
 
     with raises(FrozenInstanceError):
-        tuple_.subject = _direct_subject(id_="jane")  # ty: ignore[invalid-assignment]
+        tuple_.subject = _direct_subject(id_="jane")  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        tuple_.relation = "viewer"  # ty: ignore[invalid-assignment]
+        tuple_.relation = "viewer"  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        tuple_.object = _object(id_="43")  # ty: ignore[invalid-assignment]
+        tuple_.object = _object(id_="43")  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]

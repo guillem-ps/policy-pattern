@@ -4,12 +4,13 @@ Test module for the reference module.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import InvalidIdentifierError
 from policy_pattern.models import Reference
 
 
+@mark.unit
 def test_reference_valid_construction() -> None:
     """
     Test that a valid Reference can be constructed without raising an error.
@@ -18,6 +19,7 @@ def test_reference_valid_construction() -> None:
     assert reference.name == "owner"
 
 
+@mark.unit
 def test_reference_invalid_name_empty() -> None:
     """
     Test that an InvalidIdentifierError is raised when name is invalid.
@@ -26,6 +28,7 @@ def test_reference_invalid_name_empty() -> None:
         Reference(name="")
 
 
+@mark.unit
 def test_reference_equality() -> None:
     """
     Test that two Reference instances with the same name are equal.
@@ -33,15 +36,17 @@ def test_reference_equality() -> None:
     assert Reference(name="owner") == Reference(name="owner")
 
 
+@mark.unit
 def test_reference_is_frozen() -> None:
     """
     Test that Reference instances cannot be mutated after construction.
     """
     reference = Reference(name="owner")
     with raises(FrozenInstanceError):
-        reference.name = "editor"  # ty: ignore[invalid-assignment]
+        reference.name = "editor"  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_reference_inequality_different_name() -> None:
     """
     Test that two Reference instances with different names are not equal.
@@ -49,6 +54,7 @@ def test_reference_inequality_different_name() -> None:
     assert Reference(name="owner") != Reference(name="editor")
 
 
+@mark.unit
 def test_reference_hash_consistency() -> None:
     """
     Test that the hash of two Reference instances with the same name is equal.

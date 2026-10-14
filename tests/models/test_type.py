@@ -5,12 +5,13 @@ Test module for the Type class.
 from dataclasses import FrozenInstanceError
 from types import MappingProxyType
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import InvalidIdentifierError
 from policy_pattern.models import Reference, Relation, Type
 
 
+@mark.unit
 def test_type_valid_construction() -> None:
     """
     Test that a valid Type can be constructed without raising an error.
@@ -21,6 +22,7 @@ def test_type_valid_construction() -> None:
     assert type_.permissions == {}
 
 
+@mark.unit
 def test_type_invalid_name() -> None:
     """
     Test that an InvalidIdentifierError is raised when name is invalid.
@@ -29,6 +31,7 @@ def test_type_invalid_name() -> None:
         Type(name="", relations={}, permissions={})
 
 
+@mark.unit
 def test_type_name_cannot_contain_hash() -> None:
     """
     Test that a Type name containing '#' raises InvalidIdentifierError.
@@ -46,6 +49,7 @@ def test_type_name_cannot_contain_hash() -> None:
         Type(name="folder#archive", relations={}, permissions={})
 
 
+@mark.unit
 def test_type_invalid_relation_key_raises() -> None:
     """
     Test that an InvalidIdentifierError is raised when a relations key is invalid.
@@ -54,6 +58,7 @@ def test_type_invalid_relation_key_raises() -> None:
         Type(name="document", relations={"": Relation(allowed_subject_types=("user",))}, permissions={})
 
 
+@mark.unit
 def test_type_invalid_permission_key_raises() -> None:
     """
     Test that an InvalidIdentifierError is raised when a permissions key is invalid.
@@ -62,6 +67,7 @@ def test_type_invalid_permission_key_raises() -> None:
         Type(name="document", relations={}, permissions={"": Reference(name="owner")})
 
 
+@mark.unit
 def test_type_relations_become_read_only_view() -> None:
     """
     Test that `relations` is wrapped in a MappingProxyType, blocking item assignment.
@@ -70,9 +76,10 @@ def test_type_relations_become_read_only_view() -> None:
     assert isinstance(type_.relations, MappingProxyType)
 
     with raises(TypeError):
-        type_.relations["editor"] = Relation(allowed_subject_types=("user",))  # ty: ignore[invalid-assignment]
+        type_.relations["editor"] = Relation(allowed_subject_types=("user",))  # pyright: ignore[reportIndexIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_type_permissions_become_read_only_view() -> None:
     """
     Test that `permissions` is wrapped in a MappingProxyType, blocking item assignment.
@@ -81,9 +88,10 @@ def test_type_permissions_become_read_only_view() -> None:
     assert isinstance(type_.permissions, MappingProxyType)
 
     with raises(TypeError):
-        type_.permissions["edit"] = Reference(name="owner")  # ty: ignore[invalid-assignment]
+        type_.permissions["edit"] = Reference(name="owner")  # pyright: ignore[reportIndexIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_type_relations_copies_caller_dict() -> None:
     """
     Test that mutating the original dict passed in does not affect the constructed Type.
@@ -100,6 +108,7 @@ def test_type_relations_copies_caller_dict() -> None:
     assert "editor" not in type_.relations
 
 
+@mark.unit
 def test_type_equality() -> None:
     """
     Test that two Type instances with the same fields are equal.
@@ -110,6 +119,7 @@ def test_type_equality() -> None:
     )
 
 
+@mark.unit
 def test_type_inequality_different_name() -> None:
     """
     Test that two Type instances with a different name are not equal.
@@ -117,6 +127,7 @@ def test_type_inequality_different_name() -> None:
     assert Type(name="document", relations={}, permissions={}) != Type(name="folder", relations={}, permissions={})
 
 
+@mark.unit
 def test_type_inequality_different_relations() -> None:
     """
     Test that two Type instances with different relations are not equal.
@@ -128,6 +139,7 @@ def test_type_inequality_different_relations() -> None:
     )
 
 
+@mark.unit
 def test_type_is_frozen() -> None:
     """
     Test that Type instances cannot be mutated after construction.
@@ -135,15 +147,16 @@ def test_type_is_frozen() -> None:
     type_ = Type(name="document", relations={}, permissions={})
 
     with raises(FrozenInstanceError):
-        type_.name = "folder"  # ty: ignore[invalid-assignment]
+        type_.name = "folder"  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        type_.relations = {}  # ty: ignore[invalid-assignment]
+        type_.relations = {}  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        type_.permissions = {}  # ty: ignore[invalid-assignment]
+        type_.permissions = {}  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_type_not_hashable() -> None:
     """
     Test that Type is not hashable.

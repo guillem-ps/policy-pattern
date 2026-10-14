@@ -4,7 +4,7 @@ Test module for the ports/tuple_store.py port surface.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
 from policy_pattern.ports.tuple_store import ReadResult, TupleStore, View
@@ -20,6 +20,7 @@ def _make_tuple(id_: str) -> Tuple:
     )
 
 
+@mark.unit
 def test_read_result_valid_construction() -> None:
     """
     Test that a valid ReadResult can be constructed without raising an error.
@@ -30,6 +31,7 @@ def test_read_result_valid_construction() -> None:
     assert result.complete is True
 
 
+@mark.unit
 def test_read_result_equality() -> None:
     """
     Test that two ReadResult instances with the same fields are equal.
@@ -38,6 +40,7 @@ def test_read_result_equality() -> None:
     assert ReadResult(tuples=tuples, complete=True) == ReadResult(tuples=tuples, complete=True)
 
 
+@mark.unit
 def test_read_result_inequality_different_tuples() -> None:
     """
     Test that two ReadResult instances with different tuples are not equal.
@@ -47,6 +50,7 @@ def test_read_result_inequality_different_tuples() -> None:
     )
 
 
+@mark.unit
 def test_read_result_inequality_different_complete() -> None:
     """
     Test that two ReadResult instances with a different complete flag are not equal.
@@ -55,6 +59,7 @@ def test_read_result_inequality_different_complete() -> None:
     assert ReadResult(tuples=tuples, complete=True) != ReadResult(tuples=tuples, complete=False)
 
 
+@mark.unit
 def test_read_result_hash_consistency() -> None:
     """
     Test that equal ReadResult instances have the same hash value.
@@ -63,6 +68,7 @@ def test_read_result_hash_consistency() -> None:
     assert hash(ReadResult(tuples=tuples, complete=True)) == hash(ReadResult(tuples=tuples, complete=True))
 
 
+@mark.unit
 def test_read_result_is_frozen() -> None:
     """
     Test that ReadResult instances cannot be mutated after construction.
@@ -70,28 +76,31 @@ def test_read_result_is_frozen() -> None:
     result = ReadResult(tuples=frozenset(), complete=True)
 
     with raises(FrozenInstanceError):
-        result.tuples = frozenset()  # ty: ignore[invalid-assignment]
+        result.tuples = frozenset()  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        result.complete = False  # ty: ignore[invalid-assignment]
+        result.complete = False  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_tuple_store_cannot_be_instantiated_directly() -> None:
     """
     Test that TupleStore cannot be instantiated directly — it is an ABC.
     """
     with raises(TypeError):
-        TupleStore()  # ty: ignore[call-non-callable]
+        TupleStore()  # pyright: ignore[reportAbstractUsage] # ty: ignore[call-non-callable]
 
 
+@mark.unit
 def test_view_cannot_be_instantiated_directly() -> None:
     """
     Test that View cannot be instantiated directly — it is an ABC.
     """
     with raises(TypeError):
-        View()  # ty: ignore[call-non-callable]
+        View()  # pyright: ignore[reportAbstractUsage] # ty: ignore[call-non-callable]
 
 
+@mark.unit
 def test_delete_tuples_calls_write_tuples_with_deletion_only_mutation() -> None:
     """
     Test that delete_tuples() delegates to write_tuples() with a deletion-only Mutation.
@@ -107,6 +116,7 @@ def test_delete_tuples_calls_write_tuples_with_deletion_only_mutation() -> None:
     assert store.received_mutation == Mutation(additions=frozenset(), deletions=frozenset({tuple_}))
 
 
+@mark.unit
 def test_snapshot_is_usable_as_a_context_manager() -> None:
     """
     Test that snapshot() returns something usable in a `with` block, yielding a View.

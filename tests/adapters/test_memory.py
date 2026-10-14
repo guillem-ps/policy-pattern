@@ -8,7 +8,7 @@ from subprocess import run
 from sys import executable
 from tracemalloc import get_traced_memory, start, stop
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.adapters.memory import (
     MemoryTupleStore,
@@ -26,6 +26,7 @@ def _make_tuple(id_: str) -> Tuple:
     )
 
 
+@mark.unit
 def test_cannot_set_tuples_directly_into_memory_view() -> None:
     """
     Test that the _tuples attribute of a MemoryTupleStore is private and cannot be set directly.
@@ -33,9 +34,10 @@ def test_cannot_set_tuples_directly_into_memory_view() -> None:
     memory_view = _MemoryView(frozenset({_make_tuple("alice")}))
 
     with raises(AttributeError):
-        memory_view.tuples = frozenset()  # ty: ignore[invalid-assignment]
+        memory_view.tuples = frozenset()  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_read_after_write() -> None:
     """
     Test that a snapshot taken after write_tuples() observes the written tuple.
@@ -49,6 +51,7 @@ def test_read_after_write() -> None:
         assert view.read_tuple(tuple_.subject, tuple_.relation, tuple_.object) is True
 
 
+@mark.unit
 def test_read_relation_returns_complete_when_matches_at_or_under_limit() -> None:
     """
     Test that read_relation() reports complete=True when matches are within the limit.
@@ -64,6 +67,7 @@ def test_read_relation_returns_complete_when_matches_at_or_under_limit() -> None
     assert result.tuples == tuples
 
 
+@mark.unit
 def test_read_relation_truncates_exactly_at_limit() -> None:
     """
     Test that read_relation() reports complete=False and returns exactly `limit` tuples when more exist.
@@ -79,6 +83,7 @@ def test_read_relation_truncates_exactly_at_limit() -> None:
     assert len(result.tuples) == 2
 
 
+@mark.unit
 def test_read_relation_truncation_is_deterministic() -> None:
     """
     Test that truncation always keeps the same `limit` tuples, sorted by repr(), not an arbitrary subset.
@@ -98,6 +103,7 @@ def test_read_relation_truncation_is_deterministic() -> None:
     assert result.tuples == expected
 
 
+@mark.unit
 def test_read_relation_with_limit_zero_reports_incomplete_when_matches_exist() -> None:
     """
     Test that limit=0 is well-defined: any match makes the result immediately incomplete, never a crash.
@@ -111,6 +117,8 @@ def test_read_relation_with_limit_zero_reports_incomplete_when_matches_exist() -
     assert result == ReadResult(tuples=frozenset(), complete=False)
 
 
+@mark.slow
+@mark.unit
 def test_read_relation_does_not_materialize_all_matches_before_truncating() -> None:
     """
     Test that read_relation() bounds peak memory to ~limit, not to the full match count.
@@ -146,6 +154,7 @@ def test_read_relation_does_not_materialize_all_matches_before_truncating() -> N
 _DETERMINISM_PROBE: Path = Path(__file__).parent / "determinism_probe.py"
 
 
+@mark.unit
 def test_read_relation_truncation_is_deterministic_across_processes() -> None:
     """
     Test that read_relation() truncation is identical across different PYTHONHASHSEED values.

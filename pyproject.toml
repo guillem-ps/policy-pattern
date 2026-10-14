@@ -79,9 +79,10 @@ addopts = [
     "--color=yes",      # color the output
 ]
 markers = [
-    "unit: relation rewrite / evaluator logic, no storage",
+    "unit: fast, deterministic tests with no real external dependency (no database, no filesystem/network I/O)",
     "contract: shared TupleStore contract, runs against every adapter",
     "integration: real PostgreSQL via testcontainers",
+    "slow: performance-sensitive tests that may take longer to run",
 ]
 xfail_strict = true
 
