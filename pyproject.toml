@@ -79,7 +79,7 @@ addopts = [
     "--color=yes",      # color the output
 ]
 markers = [
-    "unit: fast, deterministic tests with no real external dependency (no database, no filesystem/network I/O)",
+    "unit: fast, deterministic tests with no live external service (no real database, no network call)",
     "contract: shared TupleStore contract, runs against every adapter",
     "integration: real PostgreSQL via testcontainers",
     "slow: performance-sensitive tests that may take longer to run",
