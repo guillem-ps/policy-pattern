@@ -55,7 +55,7 @@ test = [
     "psycopg-pool>=3.3.3",
     "psycopg[binary]>=3.3.6",
     "pytest>=9.1.1",
-    "testcontainers>=4.15.0",
+    "testcontainers[postgres]>=4.15.0",
     { include-group = "coverage" },
 ]
 all = [

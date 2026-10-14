@@ -392,10 +392,23 @@ theory → Python classes" § Errors above.
 protocols. No consumer needs that substitutability yet; splitting now would
 be an abstraction with one implementation.
 
-`MemoryTupleStore` is the only adapter in v1: lock, copy the tuple set,
-release lock, evaluate against the immutable copy (per `semantics.md`'s
-Threading section). A future `PostgresTupleStore` does not require touching
-`ports/tuple_store.py` or the evaluator.
+`MemoryTupleStore` (v1) and `PostgresTupleStore` (v2) are both adapters
+of the same `TupleStore` port. `MemoryTupleStore`: lock, copy the tuple
+set, release lock, evaluate against the immutable copy (per
+`semantics.md`'s Threading section). Building `PostgresTupleStore` did
+not require touching `ports/tuple_store.py` or the evaluator — confirming
+the port boundary holds for a second, real adapter, not just the first
+one.
+
+### Database Adapters
+
+`PostgresTupleStore` stores authorization tuples in a dedicated table within the consuming service's database. This provides a straightforward SQL-backed implementation of the `TupleStore` contract while keeping the authorization model and permission evaluation independent of the database engine.
+
+As `policy-pattern` is an in-process library rather than a standalone service, it does not create or migrate database objects automatically. The PostgreSQL schema is distributed as a versioned SQL resource, and the consuming service applies the migration through its own migration and deployment workflow.
+
+The adapter stores tuples explicitly and does not derive authorization relationships from business tables or synchronize them with existing business data. This keeps the adapter independent of application-specific schemas, at the cost of requiring a dedicated tuple table.
+
+Services whose authorization relationships already exist in their business tables can provide their own `TupleStore` implementation to read and write those relationships directly, without modifying the `policy-pattern` core. A generic business-table mapping adapter is not currently included, as it would introduce additional configuration and complexity without a concrete use case.
 
 ## Scope
 
@@ -408,8 +421,12 @@ v1.x:  compile()-time schema-cycle detection (better error message, not a
        an invariants API over an explicit fixture set, unused/complexity
        static warnings, Mermaid/DOT visualization
 v2:    semantic model diff over an explicit fixture set, text DSL,
-       Postgres adapter, OpenFGA/SpiceDB import-export interop
+       OpenFGA/SpiceDB import-export interop
 ```
+
+The Postgres adapter was v2's first scoped item; it is done — see
+`adapters/postgres.py` and "Database Adapters" above. The remaining v2
+list above is what's still outstanding.
 
 `explain()` is deferred specifically because explaining a `DENY` is an
 information-disclosure risk (e.g. revealing that `team:backend` exists and

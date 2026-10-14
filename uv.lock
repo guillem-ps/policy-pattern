@@ -588,7 +588,7 @@ all = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "python-semantic-release", specifier = ">=9.15.0" },
     { name = "ruff", specifier = ">=0.16.7" },
-    { name = "testcontainers", specifier = ">=4.15.0" },
+    { name = "testcontainers", extras = ["postgres"], specifier = ">=4.15.0" },
     { name = "ty", specifier = ">=0.0.80" },
 ]
 coverage = [{ name = "coverage", extras = ["toml"], specifier = ">=7.0.0" }]
@@ -600,7 +600,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "python-semantic-release", specifier = ">=9.15.0" },
     { name = "ruff", specifier = ">=0.16.7" },
-    { name = "testcontainers", specifier = ">=4.15.0" },
+    { name = "testcontainers", extras = ["postgres"], specifier = ">=4.15.0" },
     { name = "ty", specifier = ">=0.0.80" },
 ]
 develop = [{ name = "pre-commit", specifier = ">=4.0.0" }]
@@ -615,7 +615,7 @@ test = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "psycopg-pool", specifier = ">=3.3.3" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "testcontainers", specifier = ">=4.15.0" },
+    { name = "testcontainers", extras = ["postgres"], specifier = ">=4.15.0" },
 ]
 
 [[package]]
