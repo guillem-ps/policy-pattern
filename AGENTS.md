@@ -35,10 +35,16 @@ Key paths:
 - [`docs/errors.md`](docs/errors.md): the `PPxxx` error code ranges and what each one means.
 - `docs/threat-model.md`: planned, not written yet (no link — doesn't exist).
 - `tests/`: mirrors `policy_pattern/` (`models/`, `ports/`, `adapters/`,
-  `test_evaluator.py`, plus `mother_classes/` for shared test doubles).
-  Will split into `unit/`, `contract/` (shared across adapters), and
-  `integration/` (real PostgreSQL via testcontainers) once a second
-  adapter exists — a single-adapter contract suite proves nothing yet.
+  `test_evaluator.py`, plus `mother_classes/` for shared test doubles),
+  plus `contract/` (the shared `TupleStore` suite, parametrized over
+  every adapter — see below). Split by pytest marker, not by directory:
+  `unit` (fast, no real external dependency), `integration` (needs
+  Docker/testcontainers), `contract` (runs against every adapter),
+  `slow` (excluded from the fast local loop regardless of the other
+  three). `tests/conftest.py` holds the shared PostgreSQL fixtures.
+  `contract/`'s postgres-parametrized half tags itself `integration` via
+  `pytest.param(..., marks=...)` directly in the fixture's `params=`
+  list — no collection hook involved.
 - [`pyproject.toml`](pyproject.toml): package metadata and tool configuration (PEP 621).
 - `uv.lock`: locked, reproducible dependency resolution — commit it.
 - [`CHANGELOG.md`](CHANGELOG.md): Keep a Changelog format. Add an entry
@@ -77,11 +83,10 @@ integration tests need Docker (testcontainers).
   consistency guarantees) MUST be reflected in `docs/semantics.md` first —
   that document is the contract, the Python `ABC` is just one expression
   of it.
-- Any change to adapter behavior MUST pass the shared contract test suite
-  against every adapter — once that suite exists. With `MemoryTupleStore` as
-  the only adapter there is no `tests/contract/` yet, and a single-adapter
-  contract suite proves nothing; it arrives with `PostgresTupleStore`. Until
-  then, exercise adapter behavior directly under `tests/adapters/`.
+- Any change to adapter behavior MUST pass `tests/contract/` (parametrized
+  over `MemoryTupleStore` and `PostgresTupleStore`) — that suite is what
+  actually proves substitutability, not a single-adapter test under
+  `tests/adapters/` on its own.
 - Never resolve an unknown by guessing. When a question cannot be settled
   from `docs/semantics.md`, the code, or this file, mark it inline where the
   decision would go — `[NEEDS CLARIFICATION: <question>]` — complete
@@ -111,9 +116,14 @@ Or the `Makefile` shortcuts: `make format`, `make lint` (`ruff check` +
 - Run a specific file: `uv run pytest tests/path/to_test.py`
 - Run a focused test: `uv run pytest -k "expression"`
 - Run across every supported Python version (3.12/3.13/3.14): `make test-all`
-- Contract tests will live under `tests/contract/` and run against every
-  adapter — a passing suite on `MemoryTupleStore` alone proves nothing about
-  `PostgresTupleStore`. Not created yet; it pays off with the second adapter.
+- Contract tests live under `tests/contract/` and run against every
+  adapter (`uv run pytest tests/contract/`) — a passing suite on
+  `MemoryTupleStore` alone proves nothing about `PostgresTupleStore`,
+  which is why both are exercised through the same parametrized `store`
+  fixture rather than two separate test files.
+- Fast local loop (no Docker, no slow tests): `uv run pytest -m "not
+  integration and not slow"`. Run just the PostgreSQL side:
+  `uv run pytest -m integration` (needs Docker).
 - **Never mock the authorization engine itself** in a test that exercises
   `check()` or the evaluator — that is exactly the component a security bug
   would hide behind. See [`docs/semantics.md`](docs/semantics.md) for why (false-allow

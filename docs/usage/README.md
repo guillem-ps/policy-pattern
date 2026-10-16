@@ -230,3 +230,60 @@ except UnknownTypeError as error:
 ```
 
 See [Errors](../errors.md) for the full code registry and design rationale.
+
+## Using `PostgresTupleStore`
+
+`PostgresTupleStore` stores tuples in a PostgreSQL table. It never creates
+or migrates that schema itself — schema changes are the host service's
+own responsibility, applied through whatever migration tool it already
+uses (Alembic, a raw-SQL migration step, etc.).
+
+The matching DDL ships as a package resource, not as code the library
+runs:
+
+```python
+from importlib.resources import files
+
+migration_sql = files("policy_pattern").joinpath("sql", "postgres", "0001_create_policy_tuples.sql").read_text()
+```
+
+Hand that string to your migration tool the same way you'd hand it any
+other raw-SQL migration step — e.g. `op.execute(migration_sql)` in an
+Alembic revision. Apply it once, before the service that uses
+`PostgresTupleStore` ever starts.
+
+Once the schema exists, construct the adapter with a real connection pool:
+
+```python
+from psycopg_pool import ConnectionPool
+from policy_pattern.adapters.postgres import PostgresTupleStore
+from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
+
+pool = ConnectionPool("postgresql://...")  # opened/closed by your app
+store = PostgresTupleStore(pool)
+
+alice = DirectSubject(object=ObjectReference(type="user", id="alice"))
+document_42 = ObjectReference(type="document", id="42")
+t = Tuple(subject=alice, relation="viewer", object=document_42)
+
+store.write_tuples(Mutation(additions=frozenset({t}), deletions=frozenset()))
+with store.snapshot() as view:
+    view.read_tuple(alice, "viewer", document_42)
+```
+
+Three things worth knowing before relying on this in a real service:
+
+- **Runtime credentials need only `SELECT`/`INSERT`/`DELETE` on the tuple
+  table.** `CREATE TABLE` privileges belong to whatever role runs your
+  migrations, not to the role `PostgresTupleStore` connects with day to
+  day — the adapter never issues a schema-changing statement.
+- **A missing table is not handled specially.** If the migration was
+  never applied, the first query raises the driver's own "relation does
+  not exist" error. `PostgresTupleStore` does not check for the table's
+  existence, and does not create it on your behalf, by design.
+- **Writing a tuple is not in the same transaction as your own business
+  writes.** `write_tuples()` commits its own transaction when it
+  returns. If a request needs "update this business row and record this
+  permission tuple atomically," that's a cross-transaction coordination
+  problem your service has to solve itself — `policy-pattern` does not
+  provide a way to enlist both in one transaction.
