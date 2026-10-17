@@ -149,6 +149,13 @@ Or the `Makefile` shortcuts: `make format`, `make lint` (`ruff check` +
 
 ## Architecture Conventions
 
+- **Storage stays hexagonal, always.** `ports/tuple_store.py`'s abstract
+  `TupleStore` is the only contract a storage backend implements — no
+  storage-specific detail (SQL, a driver's connection/cursor types, a
+  backend's own error shapes) leaks into `evaluator.py` or the model
+  layer. A new backend adds an adapter; it never changes the port's
+  shape to fit itself.
+
 Where a given kind of change lands, and what else it forces you to touch:
 
 - **New `PermissionExpression` node** (alongside `Reference`, `Union`,
