@@ -295,3 +295,11 @@ Three things worth knowing before relying on this in a real service:
   permission tuple atomically," that's a cross-transaction coordination
   problem your service has to solve itself — `policy-pattern` does not
   provide a way to enlist both in one transaction.
+- **An `Identifier` valid by its own rules can still be too large for
+  this adapter.** `Identifier` bounds a value by code points (255 max,
+  any printable Unicode), not encoded bytes. `write_tuples()` checks the
+  encoded size of an addition's primary key before acquiring a
+  connection and raises `IndexEntryTooLargeError` (`PP900`) if it would
+  exceed PostgreSQL's B-tree index entry limit, instead of letting the
+  driver's own cryptic "index row size exceeds btree ... maximum" error
+  surface.

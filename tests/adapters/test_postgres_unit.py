@@ -9,6 +9,7 @@ from pytest import mark, raises
 
 from policy_pattern.adapters._db_protocols import Connection, ConnectionPool, Cursor
 from policy_pattern.adapters.postgres import PostgresTupleStore
+from policy_pattern.errors import IndexEntryTooLargeError
 from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
 
 
@@ -129,6 +130,30 @@ def test_write_tuples_rolls_back_and_reraises_executemany_error() -> None:
 
     assert connection.rollback_calls == 1
     assert connection.commit_calls == 0
+
+
+@mark.unit
+def test_write_tuples_rejects_an_addition_whose_key_exceeds_the_btree_index_limit() -> None:
+    """Test that an addition whose encoded primary key would exceed Postgres's B-tree index entry
+    limit is rejected before any connection is acquired, instead of reaching the driver as a raw
+    "index row size exceeds btree ... maximum" error.
+
+    `four_byte_char * 255` is Identifier's own max length (255 code points), each one a 4-byte
+    UTF-8 character (U+10348, outside the BMP) — a value that is perfectly valid per Identifier's
+    own contract. Three such columns alone already sum past Postgres's ~2704-byte limit for the
+    default 8KB page size, without needing to max out all six.
+    """
+    four_byte_char = "\U00010348"
+    huge = four_byte_char * 255
+    tuple_ = Tuple(
+        subject=DirectSubject(object=ObjectReference(type="user", id=huge)),
+        relation=huge,
+        object=ObjectReference(type=huge, id="42"),
+    )
+    mutation = Mutation(additions=frozenset({tuple_}), deletions=frozenset())
+
+    with raises(IndexEntryTooLargeError):
+        PostgresTupleStore(_NeverCalledPool()).write_tuples(mutation)
 
 
 @mark.unit

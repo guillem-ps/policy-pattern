@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from importlib.resources import files
 from typing import Any, override
 
+from policy_pattern.errors import IndexEntryTooLargeError
 from policy_pattern.models import Mutation, ObjectReference, Subject
 from policy_pattern.ports import ReadResult, TupleStore, View
 
@@ -14,6 +15,32 @@ from ._db_protocols import Connection, ConnectionPool, Cursor
 from ._tuple_mapping import columns, compose, decompose
 
 MIGRATION_RESOURCE: tuple[str, str, str] = ("sql", "postgres", "0001_create_policy_tuples.sql")
+
+# PostgreSQL's B-tree index entry limit for the default 8KB page size
+# (BLCKSZ). Identifier bounds a value to 255 code points, any printable
+# Unicode — not encoded bytes — so a value valid by its own contract can
+# still make the composite primary key exceed this limit once UTF-8
+# encoded.
+#
+# BLCKSZ is a compile-time option (--with-blocksize, 1KB-32KB); no
+# packaged distribution (apt/yum/Docker/RDS/Cloud SQL/...) ever changes
+# it from 8KB, only a from-source build with a non-default flag would.
+# This adapter does not detect that case — it would need to query
+# `block_size` at runtime to compute the real limit, which this constant
+# deliberately skips. If it ever happens: a *smaller* BLCKSZ makes this
+# check too permissive (the real Postgres limit drops below 2704, so
+# some additions this check lets through still fail server-side with
+# the driver's own cryptic error); a *larger* BLCKSZ makes it too
+# strict (the real limit rises above 2704, so some additions that would
+# have succeeded get rejected here instead).
+#
+# The check below sums only the six columns' raw UTF-8 byte length — it
+# does not add PostgreSQL's own per-entry overhead (an IndexTupleData
+# header plus a varlena length header per long TEXT column, roughly
+# 30-40 bytes total for six columns this long). The margin subtracted
+# here covers that, so this check triggers slightly before the real
+# server-side limit rather than slightly after.
+_BTREE_MAX_INDEX_ENTRY_BYTES: int = 2640  # 2704 minus a 64-byte margin for overhead not counted above
 
 _INSERT_SQL: str = """
     INSERT INTO "authz_tuples"
@@ -107,14 +134,34 @@ class PostgresTupleStore(TupleStore):
         cursor()/commit()/rollback() explicitly — plain DB-API 2.0, not
         psycopg3's own transaction() convenience, so this stays portable
         to any driver satisfying Connection.
+
+        Raises:
+            IndexEntryTooLargeError: An addition's encoded primary key
+                would exceed PostgreSQL's B-tree index entry limit —
+                checked before acquiring any connection, turning the
+                driver's own cryptic "index row size exceeds btree ...
+                maximum" error into one naming the offending tuple.
         """
         if not mutation.additions and not mutation.deletions:
             return
+
+        for t in mutation.additions:
+            encoded_size = sum(len(column.encode("utf-8")) for column in columns(t))
+            if encoded_size > _BTREE_MAX_INDEX_ENTRY_BYTES:
+                raise IndexEntryTooLargeError(
+                    message=(
+                        f"tuple's encoded primary key is {encoded_size!r} bytes, exceeding "
+                        f"PostgreSQL's {_BTREE_MAX_INDEX_ENTRY_BYTES!r}-byte B-tree index entry limit"
+                    ),
+                    related=f"tuple={t!r}",
+                )
+
         with self._pool.connection() as conn:
             cursor = conn.cursor()
             try:
                 if mutation.deletions:
                     cursor.executemany(_DELETE_SQL, [columns(t) for t in mutation.deletions])
+
                 if mutation.additions:
                     cursor.executemany(_INSERT_SQL, [columns(t) for t in mutation.additions])
             except Exception:

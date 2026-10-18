@@ -273,12 +273,23 @@ class Evaluator:
   `allowed_subject_types` allows, or the exhaustiveness fallback for an
   unrecognized expression type.
 - `EvaluationError` (`PP201`, runtime: budget exceeded, cycle detected).
+- `IndexEntryTooLargeError` (`PP900`) — raised by `PostgresTupleStore.write_tuples()`,
+  before acquiring any connection, when an addition's encoded primary key
+  would exceed PostgreSQL's B-tree index entry limit. `Identifier` bounds a
+  value by code points (255 max, any printable Unicode), not encoded
+  bytes, so a value valid by `Identifier`'s own contract can still be too
+  large for this adapter's composite key once UTF-8-encoded. First use of
+  the `PP9xx` (storage/adapter) range.
 
-No `StorageError` class in v1: `MemoryTupleStore` never raises a storage
-error, so there is no consumer for one yet. The contract is "adapters
-raise their own errors, always propagated, never swallowed"
-(`semantics.md`) — not "inherit from a `policy_pattern` base." Add one
-when an adapter that actually raises one exists.
+No shared `StorageError` base: the contract is "adapters raise their own
+errors, always propagated, never swallowed" (`semantics.md`) — not
+"inherit from a `policy_pattern` base." `IndexEntryTooLargeError` is not
+such a base class to inherit from — it's a concrete, leaf error. Today
+only `PostgresTupleStore` raises it (`MemoryTupleStore` raises none);
+its name stays generic rather than Postgres-specific only so a future
+adapter facing the identical physical constraint (e.g. a B-tree-backed
+engine with its own index-entry size limit) could raise this same class
+directly, without inheriting from anything.
 
 ## Module layout
 
@@ -293,7 +304,8 @@ policy_pattern/
 │   ├── unknown_type_error.py     # UnknownTypeError (PP202)
 │   ├── unknown_name_error.py     # UnknownNameError (PP203)
 │   ├── model_validation_error.py # ModelValidationError (PP101)
-│   └── evaluation_error.py       # EvaluationError (PP201)
+│   ├── evaluation_error.py       # EvaluationError (PP201)
+│   └── index_entry_too_large_error.py # IndexEntryTooLargeError (PP900)
 ├── models/
 │   ├── identifier.py             # Identifier — Built
 │   ├── object_reference.py       # ObjectReference — Built
