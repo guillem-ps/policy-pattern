@@ -116,6 +116,13 @@ Or the `Makefile` shortcuts: `make format`, `make lint` (`ruff check` +
 - Run a specific file: `uv run pytest tests/path/to_test.py`
 - Run a focused test: `uv run pytest -k "expression"`
 - Run across every supported Python version (3.12/3.13/3.14): `make test-all`
+- `pytest-randomly` shuffles module, class, and test order every run (a
+  fresh random seed each time) — this is intentional: a suite whose
+  pass/fail depends on execution order has a hidden ordering dependency,
+  and a fixed order would hide that. Reproduce a specific run's order
+  with `uv run pytest --randomly-seed=<seed>` (the seed is printed at
+  the top of every run's output); `--randomly-seed=last` reuses the
+  previous run's seed.
 - Contract tests live under `tests/contract/` and run against every
   adapter (`uv run pytest tests/contract/`) — a passing suite on
   `MemoryTupleStore` alone proves nothing about `PostgresTupleStore`,
