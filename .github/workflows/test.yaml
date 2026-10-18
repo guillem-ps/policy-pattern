@@ -26,8 +26,8 @@ jobs:
       - name: Run tests (excluding integration)
         run: uv run --python ${{ matrix.python-version }} pytest -m "not integration"
 
-  test-postgres:
-    name: Test (PostgreSQL integration, Python ${{ matrix.python-version }})
+  test-integration:
+    name: Test (integration, Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
     strategy:
@@ -39,7 +39,7 @@ jobs:
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
       - name: Install dependencies
         run: uv sync --locked --python ${{ matrix.python-version }}
-      - name: Run PostgreSQL integration tests
+      - name: Run integration tests
         run: uv run --python ${{ matrix.python-version }} pytest -m integration
 
   coverage:
