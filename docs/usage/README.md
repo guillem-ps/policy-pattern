@@ -233,10 +233,17 @@ See [Errors](../errors.md) for the full code registry and design rationale.
 
 ## Using `PostgresTupleStore`
 
-`PostgresTupleStore` stores tuples in a PostgreSQL table. It never creates
-or migrates that schema itself — schema changes are the host service's
-own responsibility, applied through whatever migration tool it already
-uses (Alembic, a raw-SQL migration step, etc.).
+`PostgresTupleStore` stores tuples in a PostgreSQL table. By default, it
+does not create or migrate that schema: the host service applies the
+change through its migration tool (Alembic, a raw-SQL migration step,
+etc.).
+
+As an opt-in convenience, pass `auto_create_schema=True` to create the
+table from the packaged migration when constructing the adapter. This
+requires the connection role to have `CREATE` privilege. It runs
+`CREATE TABLE IF NOT EXISTS`; it does not track migration history or
+verify an existing table's schema, so use your service's migration
+workflow when you need managed schema changes.
 
 The matching DDL ships as a package resource, not as code the library
 runs:
@@ -249,8 +256,9 @@ migration_sql = files("policy_pattern").joinpath("sql", "postgres", "0001_create
 
 Hand that string to your migration tool the same way you'd hand it any
 other raw-SQL migration step — e.g. `op.execute(migration_sql)` in an
-Alembic revision. Apply it once, before the service that uses
-`PostgresTupleStore` ever starts.
+Alembic revision. For the default setup, apply it once before the service
+that uses `PostgresTupleStore` starts. With `auto_create_schema=True`,
+the adapter runs this packaged SQL at construction instead.
 
 Once the schema exists, construct the adapter with a real connection pool:
 
@@ -273,14 +281,14 @@ with store.snapshot() as view:
 
 Three things worth knowing before relying on this in a real service:
 
-- **Runtime credentials need only `SELECT`/`INSERT`/`DELETE` on the tuple
-  table.** `CREATE TABLE` privileges belong to whatever role runs your
-  migrations, not to the role `PostgresTupleStore` connects with day to
-  day — the adapter never issues a schema-changing statement.
+- **With the default setting, runtime credentials need only
+  `SELECT`/`INSERT`/`DELETE` on the tuple table.** If you enable
+  `auto_create_schema`, the connection role also needs `CREATE` privilege.
 - **A missing table is not handled specially.** If the migration was
   never applied, the first query raises the driver's own "relation does
-  not exist" error. `PostgresTupleStore` does not check for the table's
-  existence, and does not create it on your behalf, by design.
+  not exist" error when using the default setting. With
+  `auto_create_schema=True`, the adapter attempts to create the table
+  during construction.
 - **Writing a tuple is not in the same transaction as your own business
   writes.** `write_tuples()` commits its own transaction when it
   returns. If a request needs "update this business row and record this

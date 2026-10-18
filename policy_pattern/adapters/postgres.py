@@ -4,6 +4,7 @@ PostgreSQL TupleStore adapter — typed against a stdlib Protocol, no database d
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from importlib.resources import files
 from typing import Any, override
 
 from policy_pattern.models import Mutation, ObjectReference, Subject
@@ -11,6 +12,8 @@ from policy_pattern.ports import ReadResult, TupleStore, View
 
 from ._db_protocols import Connection, ConnectionPool, Cursor
 from ._tuple_mapping import columns, compose, decompose
+
+MIGRATION_RESOURCE: tuple[str, str, str] = ("sql", "postgres", "0001_create_policy_tuples.sql")
 
 _INSERT_SQL: str = """
     INSERT INTO "authz_tuples"
@@ -46,26 +49,54 @@ class PostgresTupleStore(TupleStore):
     Stores tuples in the fixed table `authz_tuples`. The matching schema ships as a versioned SQL
     resource (`policy_pattern/sql/postgres/0001_create_policy_tuples.sql`)
     for the consuming service's own migration tooling to apply — this
-    adapter never creates or migrates schema itself.
-
-    Example:
-        from psycopg_pool import ConnectionPool
-
-        pool = ConnectionPool("postgresql://...")  # from the host app
-        store = PostgresTupleStore(pool)
-        store.write_tuples(Mutation(additions=frozenset({t}), deletions=frozenset()))
+    adapter never creates or migrates schema itself, unless `auto_create_schema=True`.
 
     Precondition (documented, not runtime-checked): every connection
     `pool` hands out must have `autocommit=False` (DB-API 2.0's own
     required default). If violated, write_tuples() loses atomicity and
     snapshot()'s isolation-level statement has no transaction to apply to.
+
+    `auto_create_schema` (default False): when True, runs the packaged
+    migration (`CREATE TABLE IF NOT EXISTS`) once at construction time,
+    using a connection from `pool`. Requires that connection's role to
+    have `CREATE` privilege — stricter than the default
+    (`SELECT`/`INSERT`/`DELETE` only). Not a substitute for a real
+    migration history: concurrent process startup may run this
+    concurrently across instances — Postgres serializes the DDL
+    internally so this does not corrupt the schema, but it is not
+    tracked by any migration tool either. See `docs/usage/README.md`
+    for when this trade-off is worth taking.
     """
 
-    def __init__(self, pool: ConnectionPool) -> None:
+    def __init__(self, pool: ConnectionPool, *, auto_create_schema: bool = False) -> None:
         """
-        Stores the pool for later use. Never opens a connection or touches the database.
+        Stores the pool for later use. Never opens a connection or touches the
+        database, unless `auto_create_schema=True`.
         """
         self._pool = pool
+        if auto_create_schema:
+            self._create_schema()
+
+    def _create_schema(self) -> None:
+        """
+        Applies the packaged migration directly. Only reachable when
+        `auto_create_schema=True` — never part of the default construction path.
+
+        try/except/rollback, same reason as write_tuples(): the pool's
+        connection() context manager does not roll back on its own, so a
+        failed execute() would otherwise return an aborted transaction to
+        the pool for the next caller to trip over.
+        """
+        migration_sql = files("policy_pattern").joinpath(*MIGRATION_RESOURCE).read_text(encoding="utf-8")
+        with self._pool.connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(migration_sql)
+            except Exception:
+                conn.rollback()
+                raise
+            else:
+                conn.commit()
 
     @override
     def write_tuples(self, mutation: Mutation) -> None:

@@ -14,6 +14,8 @@ from psycopg_pool import ConnectionPool
 from pytest import fixture
 from testcontainers.community.postgres import PostgresContainer
 
+from policy_pattern.adapters.postgres import MIGRATION_RESOURCE
+
 # NOTE: Override for testing propose
 # TEST_POSTGRES_IMAGE=postgres:17-alpine uv run pytest -m integration
 POSTGRES_IMAGE: str = environ.get("TEST_POSTGRES_IMAGE", "postgres:16-alpine")
@@ -39,11 +41,7 @@ def postgres_pool(
     try:
         pool.open(wait=True)
 
-        migration: str = (
-            files("policy_pattern")
-            .joinpath("sql", "postgres", "0001_create_policy_tuples.sql")
-            .read_text(encoding="utf-8")
-        )
+        migration: str = files("policy_pattern").joinpath(*MIGRATION_RESOURCE).read_text(encoding="utf-8")
 
         with pool.connection() as connection, connection.cursor() as cursor:
             cursor.execute(SQL(cast(LiteralString, migration)))

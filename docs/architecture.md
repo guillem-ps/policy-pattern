@@ -404,7 +404,7 @@ one.
 
 `PostgresTupleStore` stores authorization tuples in a dedicated table within the consuming service's database. This provides a straightforward SQL-backed implementation of the `TupleStore` contract while keeping the authorization model and permission evaluation independent of the database engine.
 
-As `policy-pattern` is an in-process library rather than a standalone service, it does not create or migrate database objects automatically. The PostgreSQL schema is distributed as a versioned SQL resource, and the consuming service applies the migration through its own migration and deployment workflow.
+As `policy-pattern` is an in-process library rather than a standalone service, `PostgresTupleStore` does not create or migrate database objects by default. The PostgreSQL schema is distributed as a versioned SQL resource, and the consuming service normally applies it through its own migration and deployment workflow. Consumers may opt in to `auto_create_schema=True` to run the packaged `CREATE TABLE IF NOT EXISTS` statement during adapter construction. This requires `CREATE` privilege and does not track migration history or verify the shape of an existing table, so it is a convenience for simple setups rather than a replacement for managed migrations.
 
 The adapter stores tuples explicitly and does not derive authorization relationships from business tables or synchronize them with existing business data. This keeps the adapter independent of application-specific schemas, at the cost of requiring a dedicated tuple table.
 
