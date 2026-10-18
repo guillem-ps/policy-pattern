@@ -1,6 +1,7 @@
 from .base_error import BaseError
 from .evaluation_error import EvaluationError
 from .identifier_error import InvalidIdentifierError
+from .index_entry_too_large_error import IndexEntryTooLargeError
 from .model_validation_error import ModelValidationError
 from .mutation_error import InvalidMutationError
 from .relation_error import InvalidRelationError
@@ -10,6 +11,7 @@ from .unknown_type_error import UnknownTypeError
 __all__ = [
     "BaseError",
     "EvaluationError",
+    "IndexEntryTooLargeError",
     "InvalidIdentifierError",
     "InvalidMutationError",
     "InvalidRelationError",

@@ -4,7 +4,7 @@ Test module for the Mutation class.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import InvalidMutationError
 from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
@@ -21,6 +21,7 @@ def _tuple(id_: str = "42") -> Tuple:
     )
 
 
+@mark.unit
 def test_mutation_valid_construction() -> None:
     """
     Test that a valid Mutation can be constructed without raising an error.
@@ -30,6 +31,7 @@ def test_mutation_valid_construction() -> None:
     assert mutation.deletions == frozenset({_tuple("43")})
 
 
+@mark.unit
 def test_mutation_empty_is_valid() -> None:
     """
     Test that an empty Mutation (no additions, no deletions) is valid.
@@ -39,6 +41,7 @@ def test_mutation_empty_is_valid() -> None:
     assert mutation.deletions == frozenset()
 
 
+@mark.unit
 def test_mutation_invalid_not_disjoint() -> None:
     """
     Test that an InvalidMutationError is raised when additions and deletions overlap.
@@ -47,6 +50,7 @@ def test_mutation_invalid_not_disjoint() -> None:
         Mutation(additions=frozenset({_tuple("42")}), deletions=frozenset({_tuple("42")}))
 
 
+@mark.unit
 def test_mutation_equality() -> None:
     """
     Test that two Mutation instances with the same additions and deletions are equal.
@@ -56,6 +60,7 @@ def test_mutation_equality() -> None:
     )
 
 
+@mark.unit
 def test_mutation_inequality_different_additions() -> None:
     """
     Test that two Mutation instances with different additions are not equal.
@@ -65,6 +70,7 @@ def test_mutation_inequality_different_additions() -> None:
     )
 
 
+@mark.unit
 def test_mutation_inequality_different_deletions() -> None:
     """
     Test that two Mutation instances with different deletions are not equal.
@@ -74,6 +80,7 @@ def test_mutation_inequality_different_deletions() -> None:
     )
 
 
+@mark.unit
 def test_mutation_hash_consistency() -> None:
     """
     Test that equal Mutation instances have the same hash value.
@@ -83,6 +90,7 @@ def test_mutation_hash_consistency() -> None:
     )
 
 
+@mark.unit
 def test_mutation_is_frozen() -> None:
     """
     Test that Mutation instances cannot be mutated after construction.
@@ -90,7 +98,7 @@ def test_mutation_is_frozen() -> None:
     mutation = Mutation(additions=frozenset({_tuple("42")}), deletions=frozenset())
 
     with raises(FrozenInstanceError):
-        mutation.additions = frozenset()  # ty: ignore[invalid-assignment]
+        mutation.additions = frozenset()  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
 
     with raises(FrozenInstanceError):
-        mutation.deletions = frozenset({_tuple("43")})  # ty: ignore[invalid-assignment]
+        mutation.deletions = frozenset({_tuple("43")})  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]

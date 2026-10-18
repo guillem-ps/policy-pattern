@@ -5,12 +5,13 @@ Test module for the CompiledModel class.
 from dataclasses import FrozenInstanceError
 from types import MappingProxyType
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.errors import ModelValidationError
 from policy_pattern.models import CompiledModel, Reference, Type
 
 
+@mark.unit
 def test_compiled_model_valid_construction() -> None:
     """
     Test that a valid CompiledModel can be constructed without raising an error.
@@ -20,6 +21,7 @@ def test_compiled_model_valid_construction() -> None:
     assert compiled.types["document"] is document
 
 
+@mark.unit
 def test_compiled_model_direct_construction_validates_undeclared_reference() -> None:
     """
     Test that constructing CompiledModel directly (bypassing Model.compile()) still validates.
@@ -37,6 +39,7 @@ def test_compiled_model_direct_construction_validates_undeclared_reference() -> 
     assert exc_info.value.message == "document.view references undeclared name 'missing'"
 
 
+@mark.unit
 def test_compiled_model_direct_construction_validates_mismatched_type_name() -> None:
     """
     Test that constructing CompiledModel directly still validates the key/name match.
@@ -49,6 +52,7 @@ def test_compiled_model_direct_construction_validates_mismatched_type_name() -> 
     assert exc_info.value.message == "model key 'document' does not match Type.name 'folder'"
 
 
+@mark.unit
 def test_compiled_model_types_become_read_only_view() -> None:
     """
     Test that `types` is wrapped in a MappingProxyType, blocking item assignment.
@@ -60,6 +64,7 @@ def test_compiled_model_types_become_read_only_view() -> None:
         compiled.types["folder"] = Type(name="folder", relations={}, permissions={})  # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_compiled_model_copies_caller_dict() -> None:
     """
     Test that mutating the original dict passed in does not affect the constructed CompiledModel.
@@ -73,6 +78,7 @@ def test_compiled_model_copies_caller_dict() -> None:
     assert "folder" not in compiled.types
 
 
+@mark.unit
 def test_compiled_model_equality() -> None:
     """
     Test that two CompiledModel instances with the same types are equal.
@@ -81,6 +87,7 @@ def test_compiled_model_equality() -> None:
     assert CompiledModel(types=types) == CompiledModel(types=types)
 
 
+@mark.unit
 def test_compiled_model_inequality_different_types() -> None:
     """
     Test that two CompiledModel instances with different types are not equal.
@@ -90,6 +97,7 @@ def test_compiled_model_inequality_different_types() -> None:
     assert CompiledModel(types={"document": document}) != CompiledModel(types={"folder": folder})
 
 
+@mark.unit
 def test_compiled_model_is_frozen() -> None:
     """
     Test that CompiledModel instances cannot be mutated after construction.
@@ -100,6 +108,7 @@ def test_compiled_model_is_frozen() -> None:
         compiled.types = {}  # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_compiled_model_not_hashable() -> None:
     """
     Test that CompiledModel is not hashable.

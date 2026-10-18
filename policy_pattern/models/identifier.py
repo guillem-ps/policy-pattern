@@ -5,7 +5,7 @@ Value Object representing an entity identifier.
 from dataclasses import dataclass
 from typing import ClassVar
 
-from ..errors import InvalidIdentifierError
+from policy_pattern.errors import InvalidIdentifierError
 
 
 @dataclass(frozen=True, slots=True)

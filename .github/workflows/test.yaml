@@ -23,8 +23,24 @@ jobs:
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
       - name: Install dependencies
         run: uv sync --locked --python ${{ matrix.python-version }}
-      - name: Run tests
-        run: uv run --python ${{ matrix.python-version }} pytest
+      - name: Run tests (excluding integration)
+        run: uv run --python ${{ matrix.python-version }} pytest -m "not integration"
+
+  test-integration:
+    name: Test (integration, Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled' || github.event.label.name == 'retrigger-ci'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+      - name: Install dependencies
+        run: uv sync --locked --python ${{ matrix.python-version }}
+      - name: Run integration tests
+        run: uv run --python ${{ matrix.python-version }} pytest -m integration
 
   coverage:
     name: Coverage
@@ -34,7 +50,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --only-group test
       - name: Run tests with coverage
         run: |
           uv run coverage run -m pytest

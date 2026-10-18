@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar
 
-from ..errors import InvalidIdentifierError
+from policy_pattern.errors import InvalidIdentifierError
+
 from .identifier import Identifier
 from .operators import PermissionExpression
 from .relation import Relation

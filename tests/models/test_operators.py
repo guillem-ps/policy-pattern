@@ -5,11 +5,12 @@ And the resulting classes Union, Intersection, and Exclusion.
 
 from dataclasses import FrozenInstanceError
 
-from pytest import raises
+from pytest import mark, raises
 
 from policy_pattern.models import Exclusion, Intersection, PermissionExpression, Reference, Union
 
 
+@mark.unit
 def test_or_method_return_union() -> None:
     """
     Test that the `__or__` method returns a new PermissionExpression representing the union of two expressions.
@@ -23,6 +24,7 @@ def test_or_method_return_union() -> None:
     assert union_expr.right is expr2
 
 
+@mark.unit
 def test_and_method_return_intersection() -> None:
     """
     Test that the `__and__` method returns a new PermissionExpression representing the intersection of two expressions.
@@ -36,6 +38,7 @@ def test_and_method_return_intersection() -> None:
     assert intersection_expr.right is expr2
 
 
+@mark.unit
 def test_sub_method_return_exclusion() -> None:
     """
     Test that the `__sub__` method returns a new PermissionExpression representing the exclusion of two expressions.
@@ -49,6 +52,7 @@ def test_sub_method_return_exclusion() -> None:
     assert exclusion_expr.exclude is expr2
 
 
+@mark.unit
 def test_union_equality() -> None:
     """
     Test that two Union instances with the same left and right are equal.
@@ -58,6 +62,7 @@ def test_union_equality() -> None:
     )
 
 
+@mark.unit
 def test_union_inequality_different_left() -> None:
     """
     Test that two Union instances with a different left are not equal.
@@ -67,6 +72,7 @@ def test_union_inequality_different_left() -> None:
     )
 
 
+@mark.unit
 def test_union_inequality_different_right() -> None:
     """
     Test that two Union instances with a different right are not equal.
@@ -76,6 +82,7 @@ def test_union_inequality_different_right() -> None:
     )
 
 
+@mark.unit
 def test_union_hash_consistency() -> None:
     """
     Test that equal Union instances have the same hash value.
@@ -85,6 +92,7 @@ def test_union_hash_consistency() -> None:
     )
 
 
+@mark.unit
 def test_union_is_frozen() -> None:
     """
     Test that Union instances cannot be mutated after construction.
@@ -98,6 +106,7 @@ def test_union_is_frozen() -> None:
         union.right = Reference(name="viewer")  # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_intersection_equality() -> None:
     """
     Test that two Intersection instances with the same left and right are equal.
@@ -107,6 +116,7 @@ def test_intersection_equality() -> None:
     )
 
 
+@mark.unit
 def test_intersection_inequality_different_left() -> None:
     """
     Test that two Intersection instances with a different left are not equal.
@@ -116,6 +126,7 @@ def test_intersection_inequality_different_left() -> None:
     )
 
 
+@mark.unit
 def test_intersection_inequality_different_right() -> None:
     """
     Test that two Intersection instances with a different right are not equal.
@@ -125,6 +136,7 @@ def test_intersection_inequality_different_right() -> None:
     )
 
 
+@mark.unit
 def test_intersection_hash_consistency() -> None:
     """
     Test that equal Intersection instances have the same hash value.
@@ -134,6 +146,7 @@ def test_intersection_hash_consistency() -> None:
     )
 
 
+@mark.unit
 def test_intersection_is_frozen() -> None:
     """
     Test that Intersection instances cannot be mutated after construction.
@@ -147,6 +160,7 @@ def test_intersection_is_frozen() -> None:
         intersection.right = Reference(name="viewer")  # ty: ignore[invalid-assignment]
 
 
+@mark.unit
 def test_exclusion_equality() -> None:
     """
     Test that two Exclusion instances with the same include and exclude are equal.
@@ -156,6 +170,7 @@ def test_exclusion_equality() -> None:
     )
 
 
+@mark.unit
 def test_exclusion_inequality_different_include() -> None:
     """
     Test that two Exclusion instances with a different include are not equal.
@@ -165,6 +180,7 @@ def test_exclusion_inequality_different_include() -> None:
     )
 
 
+@mark.unit
 def test_exclusion_inequality_different_exclude() -> None:
     """
     Test that two Exclusion instances with a different exclude are not equal.
@@ -174,6 +190,7 @@ def test_exclusion_inequality_different_exclude() -> None:
     )
 
 
+@mark.unit
 def test_exclusion_hash_consistency() -> None:
     """
     Test that equal Exclusion instances have the same hash value.
@@ -183,6 +200,7 @@ def test_exclusion_hash_consistency() -> None:
     )
 
 
+@mark.unit
 def test_exclusion_is_frozen() -> None:
     """
     Test that Exclusion instances cannot be mutated after construction.

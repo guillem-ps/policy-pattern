@@ -49,9 +49,16 @@ module-root = "."
 coverage = ["coverage[toml]>=7.0.0"]
 develop = ["pre-commit>=4.0.0"]
 format = ["ruff>=0.16.7"]
-lint = ["ruff>=0.16.7", "ty>=0.0.80", { include-group = "test" }]
+lint = ["ruff>=0.16.7", "ty>=0.0.80"]
 release = ["python-semantic-release>=9.15.0"]
-test = ["pytest>=9.1.1", "testcontainers>=4.15.0", { include-group = "coverage" }]
+test = [
+    "psycopg-pool>=3.3.3",
+    "psycopg[binary]>=3.3.6",
+    "pytest>=9.1.1",
+    "pytest-randomly>=5.0.0",
+    "testcontainers[postgres]>=4.15.0",
+    { include-group = "coverage" },
+]
 all = [
     { include-group = "coverage" },
     { include-group = "develop" },
@@ -73,9 +80,10 @@ addopts = [
     "--color=yes",      # color the output
 ]
 markers = [
-    "unit: relation rewrite / evaluator logic, no storage",
+    "unit: fast, deterministic tests with no live external service (no real database, no network call)",
     "contract: shared TupleStore contract, runs against every adapter",
     "integration: real PostgreSQL via testcontainers",
+    "slow: performance-sensitive tests that may take longer to run",
 ]
 xfail_strict = true
 
