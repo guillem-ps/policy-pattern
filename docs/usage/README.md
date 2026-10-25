@@ -119,6 +119,26 @@ evaluator = Evaluator(model=compiled, store=store)
 evaluator.check(alice, "viewer", document_42)  # True — alice is a direct owner
 ```
 
+`check_many()` answers the same question for many requests at once, when the caller already has a list of
+candidates to filter:
+
+```python
+candidates = [document_42, ObjectReference(type="document", id="7"), ObjectReference(type="document", id="99")]
+decisions = evaluator.check_many([(alice, "viewer", document) for document in candidates])
+# [True, False, False] — only document:42 has a tuple granting alice access
+
+allowed = [document for document, decision in zip(candidates, decisions, strict=True) if decision]
+```
+
+The whole batch runs inside one `store.snapshot()` and shares one evaluation cache, so a sub-check several
+requests depend on — a parent folder's `viewer`, say — is computed once rather than once per request. The
+returned list is aligned to `requests` by position, duplicates included.
+
+This filters a candidate set; it does not discover one. `policy-pattern` has no reverse lookup
+("which documents can alice view?") — the caller supplies the candidates, usually straight from its own
+business data. The budget is shared across the batch too, so a batch large enough to exhaust it raises
+`EvaluationError` rather than returning a short list.
+
 ## Rewrite Operators
 
 Permissions compose with real Python operators:

@@ -239,6 +239,11 @@ class Evaluator:
         object: ObjectReference,
         budget: EvaluationBudget | None = None,  # defaults to EvaluationBudget()
     ) -> bool: ...
+    def check_many(
+        self,
+        requests: Sequence[tuple[Subject, str, ObjectReference]],
+        budget: EvaluationBudget | None = None,
+    ) -> list[bool]: ...
 ```
 
 - `EvaluationBudget(max_depth=25, max_nodes=10_000, max_store_reads=1_000)`
@@ -370,6 +375,13 @@ entirely against it — it never touches `TupleStore` directly, so two
 snapshots can never mix inside one `check()` (per `semantics.md`'s
 snapshot-consistency requirement).
 
+`check_many()` opens that same single `View` once for a whole batch and
+shares one `EvaluationContext` across every request in it — so the memo and
+all three budget counters accumulate over the batch rather than resetting
+per request. That sharing is the feature, not an optimization detail: it is
+why a sub-check several requests depend on is paid for once, and why a batch
+large enough to exhaust the budget raises instead of returning a short list.
+
 `EvaluationBudget` tracks more than depth alone: a wide-shallow graph (depth
 5, branching 100) can cost more than a deep-narrow one (depth 30, branching
 1) — `max_nodes` bounds pure traversal cost, `max_store_reads` bounds actual
@@ -380,16 +392,22 @@ their budget very differently.
 Evaluation order is deterministic: `Union`/`Intersection` branches are
 evaluated left-to-right, in declaration order — never `set`/hash iteration
 order. Same model + same tuples + same request + same budget ⇒ same
-decision, always.
+decision, always; and for `check_many()`, the same `requests` sequence ⇒ the
+same `list[bool]`, evaluated in input order.
 
 ## Error contract
 
 ```
-check() -> bool                         the only normal return value
+check() -> bool                          the only normal return value
+check_many() -> list[bool]               one decision per request, aligned by position
 raise EvaluationError                    budget exceeded, cycle detected
 raise ModelValidationError               compile()-time only, never at runtime
 raise <adapter-specific error>           storage errors always propagate, never swallowed into False
 ```
+
+A `check_many()` batch has no partial-result mode: any error aborts the whole
+call and propagates. Returning a shorter list would make a missing decision
+indistinguishable from a denial.
 
 No shared `policy_pattern.errors.StorageError` base in v1 — see "ReBAC
 theory → Python classes" § Errors above.
@@ -430,8 +448,10 @@ v1:    Model (Relation/Permission) + compile() + reference validation
        deterministic evaluation order, uniform runtime cycle guard
 v1.x:  compile()-time schema-cycle detection (better error message, not a
        safety requirement), explain() with an explicit trust boundary,
-       an invariants API over an explicit fixture set, unused/complexity
-       static warnings, Mermaid/DOT visualization
+       Evaluator.check_many() (batch checks — formerly unscheduled,
+       confirmed in scope, built, see below), an invariants API over an
+       explicit fixture set, unused/complexity static warnings,
+       Mermaid/DOT visualization
 v2:    semantic model diff over an explicit fixture set, text DSL,
        OpenFGA/SpiceDB import-export interop
 ```
@@ -457,12 +477,28 @@ a future proposal for one of these isn't mistaken for a new idea:
 - **Reverse lookup** — `ListObjects(subject, relation, object_type)` for
   "which documents can user:7 view?" questions. Different storage access
   pattern from forward `check()`; excluded from the v1 storage port (see
-  above).
+  above). **Confirmed deferred, not promoted, 2026-10-18**: a real
+  consumer's concrete need ("list objects this subject can act on") and a
+  comparable competitor shipping the same capability both surfaced the
+  same week — but the consumer can produce its own candidate set cheaply
+  from its own business data, so the cheap forward-only "Batch checks"
+  item below (promoted to v1.x) covers the actual need without inverting
+  `Union`/`Intersection`/`Exclusion`/`TupleToUserset` or adding a new
+  `TupleStore` read shape. Reopen `ListObjects` only if a real consumer
+  can't produce candidates cheaply on its own — not from competitive
+  pressure alone (adding it just to match a bigger competitor's feature
+  list is exactly the "feature breadth" race this project's positioning
+  already rejects).
 - **Contextual tuples** — request-scoped relationships that participate in
   one `check()` without being persisted (facts derived from a request,
   token, or application state).
-- **Batch checks** — evaluate multiple authorization questions while safely
-  reusing evaluation state across them.
+- ~~Batch checks~~ — **promoted to v1.x, 2026-10-18** (see "Scope" above):
+  evaluate multiple authorization questions while safely reusing
+  evaluation state across them. Confirmed as the engine behind the v1.x
+  invariants API, and separately as the cheap, forward-only answer to
+  "list objects this subject can act on" when the caller can supply its
+  own candidate set — see the `ListObjects` entry above for why that
+  reverse-lookup alternative stays deferred instead.
 - **Model versioning** — explicit versioning and migration of authorization
   models as applications evolve.
 - **Advanced consistency** — consistency tokens or another mechanism for

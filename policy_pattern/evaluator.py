@@ -2,6 +2,7 @@
 Evaluator: resolves check() over a CompiledModel and a TupleStore.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .errors import EvaluationError, UnknownNameError, UnknownTypeError
@@ -52,7 +53,7 @@ class EvaluationBudget:
 @dataclass(slots=True)
 class EvaluationContext:
     """
-    Live bookkeeping for exactly one `check()` call.
+    Live bookkeeping for exactly one `check()` or `check_many()` call.
 
     Deliberately mutable, unlike almost everything else in this package —
     this is not a domain value, it is the in-flight state of one
@@ -63,13 +64,19 @@ class EvaluationContext:
     (added before recursing, discarded after returning) — anything
     permanently resolved lives in `memo` instead, so the two never overlap
     in meaning.
+
+    The key carries the subject because one `check()` has a constant subject,
+    while `check_many()` can mix subjects; a narrower key could reuse one
+    subject's cached decision for another and cause a false allow.
     """
 
     view: View
     budget: EvaluationBudget
-    visited: set[tuple[ObjectReference, str]] = field(default_factory=lambda: set[tuple[ObjectReference, str]]())
-    memo: dict[tuple[ObjectReference, str], bool] = field(
-        default_factory=lambda: dict[tuple[ObjectReference, str], bool]()
+    visited: set[tuple[Subject, ObjectReference, str]] = field(
+        default_factory=lambda: set[tuple[Subject, ObjectReference, str]]()
+    )
+    memo: dict[tuple[Subject, ObjectReference, str], bool] = field(
+        default_factory=lambda: dict[tuple[Subject, ObjectReference, str], bool]()
     )
     node_count: int = 0
     store_read_count: int = 0
@@ -120,11 +127,28 @@ class Evaluator:
             context = EvaluationContext(view=view, budget=budget)
             return self._check_name(subject, name, object, context)
 
+    def check_many(
+        self,
+        requests: Sequence[tuple[Subject, str, ObjectReference]],
+        budget: EvaluationBudget | None = None,
+    ) -> list[bool]:
+        """
+        Returns one decision per request, preserving input order and duplicates.
+
+        The whole batch shares one snapshot, context, and budget. An error on
+        any request aborts the call and propagates without partial results.
+        """
+        if budget is None:
+            budget = EvaluationBudget()
+        with self._store.snapshot() as view:
+            context = EvaluationContext(view=view, budget=budget)
+            return [self._check_name(subject, name, object, context) for subject, name, object in requests]
+
     def _check_name(self, subject: Subject, name: str, object: ObjectReference, context: EvaluationContext) -> bool:
         """
         Dispatches (object, name) to a relation or permission check, with cycle/memo/budget bookkeeping.
         """
-        key = (object, name)
+        key = (subject, object, name)
         if key in context.memo:
             return context.memo[key]
         if key in context.visited:

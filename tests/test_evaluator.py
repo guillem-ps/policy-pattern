@@ -120,14 +120,24 @@ def test_evaluation_context_is_mutable() -> None:
 
 
 def _direct(id_: str) -> DirectSubject:
+    """
+    Create a DirectSubject for the given user ID.
+    """
     return DirectSubject(object=ObjectReference(type="user", id=id_))
 
 
 def _group(id_: str) -> ObjectReference:
+    """
+    Create an ObjectReference for a group with the given ID.
+    """
     return ObjectReference(type="group", id=id_)
 
 
 def _group_model() -> CompiledModel:
+    """
+    Create a CompiledModel with a single group type.
+    The group type has a "member" relation that allows subjects of type "user" or "group#member".
+    """
     return CompiledModel(
         types={
             "group": Type(
@@ -140,17 +150,27 @@ def _group_model() -> CompiledModel:
 
 
 class _SnapshotCountingStore(TupleStore):
+    """
+    A TupleStore wrapper that counts how many times snapshot() is called.
+    """
+
     def __init__(self, inner: TupleStore) -> None:
         self._inner = inner
         self.snapshot_count = 0
 
     @override
     def write_tuples(self, mutation: Mutation) -> None:
+        """
+        Write tuples to the inner store.
+        """
         self._inner.write_tuples(mutation)
 
     @override
     @contextmanager
     def snapshot(self) -> Generator[View, None, None]:
+        """
+        Open a snapshot of the inner store and increment the snapshot count.
+        """
         self.snapshot_count += 1
         with self._inner.snapshot() as view:
             yield view
@@ -564,6 +584,11 @@ def _document(id_: str) -> ObjectReference:
 
 
 def _document_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "document" type that has "owner", "editor",
+    and "blocked" relations, and "viewer", "manager", and "restricted_viewer"
+    permissions.
+    """
     return CompiledModel(
         types={
             "document": Type(
@@ -638,7 +663,7 @@ def test_union_short_circuits_right_branch() -> None:
         result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is True
-        assert (document, "editor") not in context.memo
+        assert (alice, document, "editor") not in context.memo
 
 
 @mark.unit
@@ -680,8 +705,8 @@ def test_exclusion_always_evaluates_both_sides() -> None:
         result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is False
-        assert (document, "owner") in context.memo
-        assert (document, "blocked") in context.memo
+        assert (alice, document, "owner") in context.memo
+        assert (alice, document, "blocked") in context.memo
 
 
 @mark.unit
@@ -784,10 +809,17 @@ def test_check_permission_unknown_expression_type_raises() -> None:
 
 
 def _folder(id_: str) -> ObjectReference:
+    """
+    Return an ObjectReference of type "folder" with the given id.
+    """
     return ObjectReference(type="folder", id=id_)
 
 
 def _folder_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "folder" type that has a "viewer" relation and an "inherited_viewer" permission that
+    uses TupleToUserset to inherit viewers from its parent folder.
+    """
     return CompiledModel(
         types={
             "folder": Type(
@@ -880,3 +912,167 @@ def test_check_tuple_to_userset_truncated_enumeration_raises() -> None:
 
     with raises(EvaluationError):
         evaluator.check(_direct("alice"), "inherited_viewer", child, budget=EvaluationBudget(max_nodes=4))
+
+
+@mark.unit
+def test_memo_is_not_shared_across_subjects() -> None:
+    """
+    Test that one EvaluationContext reused for two different subjects gives each its own decision.
+
+    The memo key is what this pins down. Keyed by `(object, name)` alone it
+    is safe only because a single `check()` call carries exactly one
+    subject, constant for the whole traversal — an invariant `check_many()`
+    is about to break by design. With the narrow key, alice's cached True
+    for `(document:42, "owner")` is handed straight back to bob, who owns
+    nothing: a false allow, the worst failure class this library has.
+
+    Reusing one context across two `_check_name` calls is exactly what a
+    batch does, which is why this reproduces the bug without `check_many()`
+    existing yet.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    bob = _direct("bob")
+
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    with store.snapshot() as view:
+        context = EvaluationContext(view=view, budget=EvaluationBudget())
+
+        assert evaluator._check_name(alice, "owner", document, context) is True  # pyright: ignore[reportPrivateUsage]
+        assert evaluator._check_name(bob, "owner", document, context) is False  # pyright: ignore[reportPrivateUsage]
+
+
+@mark.unit
+def test_check_many_different_subjects_do_not_share_memo() -> None:
+    """
+    Test that two different subjects checking the same (object, name) in one
+    batch each get their own correct answer, not a cached answer meant for
+    the other subject — the false-allow-class bug Task 1's key widening
+    exists to prevent.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    bob = _direct("bob")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    results = evaluator.check_many([(alice, "viewer", document), (bob, "viewer", document)])
+
+    assert results == [True, False]
+
+
+@mark.unit
+def test_check_many_preserves_order_and_duplicates() -> None:
+    """
+    Test that check_many() returns one bool per request, in input order,
+    including a repeated request.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+    requests = [
+        (alice, "viewer", document),
+        (_direct("bob"), "viewer", document),
+        (alice, "viewer", document),
+    ]
+
+    assert evaluator.check_many(requests) == [True, False, True]
+
+
+@mark.unit
+def test_check_many_budget_shared_across_requests() -> None:
+    """
+    Test that the budget's counters accumulate across the whole batch —
+    enough distinct, cheap requests still exhaust a small shared
+    max_store_reads, proving the budget isn't reissued per request.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    for doc_id in ("1", "2", "3"):
+        store.write_tuples(
+            Mutation(
+                additions=frozenset({Tuple(subject=alice, relation="owner", object=_document(doc_id))}),
+                deletions=frozenset(),
+            )
+        )
+    evaluator = Evaluator(model=model, store=store)
+    requests = [(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")]
+
+    with raises(EvaluationError):
+        evaluator.check_many(requests, budget=EvaluationBudget(max_store_reads=2))
+
+
+@mark.unit
+def test_check_many_propagates_error_and_returns_nothing() -> None:
+    """
+    Test that an error on any request aborts check_many() entirely instead
+    of returning a partial list or swallowing the exception.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    evaluator = Evaluator(model=model, store=store)
+    requests = [
+        (alice, "viewer", _document("42")),
+        (alice, "viewer", ObjectReference(type="nonexistent", id="1")),
+    ]
+
+    with raises(UnknownTypeError):
+        evaluator.check_many(requests)
+
+
+@mark.unit
+def test_check_many_empty_requests_returns_empty_list() -> None:
+    """
+    Test that check_many([]) returns [] without raising.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.check_many([]) == []
+
+
+@mark.unit
+def test_check_many_opens_exactly_one_snapshot() -> None:
+    """
+    Test that a whole batch runs inside a single store.snapshot().
+
+    docs/semantics.md's snapshot-consistency requirement is per `check()`;
+    `check_many()` extends it to the batch, so a three-request batch must
+    not see three different views of the store. Counting snapshots is the
+    only observation that catches a per-request `snapshot()` — the
+    decisions themselves come out identical either way.
+    """
+    model = _document_model()
+    inner = MemoryTupleStore()
+    alice = _direct("alice")
+    for doc_id in ("1", "2", "3"):
+        inner.write_tuples(
+            Mutation(
+                additions=frozenset({Tuple(subject=alice, relation="owner", object=_document(doc_id))}),
+                deletions=frozenset(),
+            )
+        )
+    store = _SnapshotCountingStore(inner)
+    evaluator = Evaluator(model=model, store=store)
+
+    evaluator.check_many([(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")])
+
+    assert store.snapshot_count == 1
