@@ -1111,3 +1111,40 @@ def test_check_many_opens_exactly_one_snapshot() -> None:
     evaluator.check_many([(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")])
 
     assert store.snapshot_count == 1
+
+
+@mark.unit
+def test_check_many_shares_memo_across_requests() -> None:
+    """
+    Test that a sub-check shared by several requests is paid for once:
+    three documents under the same parent folder need 3 reads to resolve
+    `parent` (one per document, unavoidable) plus exactly 1 read for the
+    folder's `viewer` check — reused via memo for the other two documents.
+    A budget of 4 only works if that reuse happens; without a shared
+    memo it would need 6 (3 + 3) and raise.
+    """
+    model = CompiledModel(
+        types={
+            "folder": Type(
+                name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+            "document": Type(
+                name="document",
+                relations={"parent": Relation(allowed_subject_types=("folder",))},
+                permissions={"can_view": TupleToUserset(tupleset="parent", computed="viewer")},
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    root = _folder("root")
+    docs = [ObjectReference(type="document", id=str(i)) for i in range(3)]
+    alice = _direct("alice")
+    additions = {Tuple(subject=alice, relation="viewer", object=root)}
+    for d in docs:
+        additions.add(Tuple(subject=DirectSubject(object=root), relation="parent", object=d))
+    store.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
+    evaluator = Evaluator(model=model, store=store)
+
+    requests = [(alice, "can_view", d) for d in docs]
+
+    assert evaluator.check_many(requests, budget=EvaluationBudget(max_store_reads=4)) == [True, True, True]
