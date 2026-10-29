@@ -1,16 +1,30 @@
 """Integration tests for the PostgreSQL TupleStore adapter."""
 
+from collections.abc import Iterator
 from typing import Any, cast
 
 from psycopg_pool import ConnectionPool
 from pytest import mark, raises
 
 from policy_pattern.adapters.postgres import PostgresTupleStore, _PostgresView  # pyright: ignore[reportPrivateUsage]
-from policy_pattern.models import DirectSubject, Mutation, ObjectReference, SubjectSet, Tuple
+from policy_pattern.evaluator import Evaluator
+from policy_pattern.models import (
+    CompiledModel,
+    DirectSubject,
+    Mutation,
+    ObjectReference,
+    Relation,
+    SubjectSet,
+    Tuple,
+    Type,
+)
 from policy_pattern.ports import ReadResult
 
 
 def _tuple(subject_id: str, *, object_id: str = "42", relation: str = "owner") -> Tuple:
+    """
+    Convenience function to create a Tuple with the given subject_id, object_id, and relation.
+    """
     return Tuple(
         subject=DirectSubject(object=ObjectReference(type="user", id=subject_id)),
         relation=relation,
@@ -19,7 +33,21 @@ def _tuple(subject_id: str, *, object_id: str = "42", relation: str = "owner") -
 
 
 def _add(*tuples: Tuple) -> Mutation:
+    """
+    Convenience function to create a Mutation with the given tuples as additions and no deletions.
+    """
     return Mutation(additions=frozenset(tuples), deletions=frozenset())
+
+
+def _requests(
+    store: PostgresTupleStore, subject: DirectSubject, first: ObjectReference, second: ObjectReference
+) -> Iterator[tuple[DirectSubject, str, ObjectReference]]:
+    """
+    A generator that yields two requests, with a write in between.
+    """
+    yield (subject, "owner", first)
+    store.write_tuples(_add(_tuple("alice", object_id="43")))
+    yield (subject, "owner", second)
 
 
 @mark.integration
@@ -131,6 +159,31 @@ def test_snapshot_is_repeatable_read(postgres_pool: ConnectionPool) -> None:
 
     with store.snapshot() as next_view:
         assert next_view.read_tuple(tuple_.subject, tuple_.relation, tuple_.object) is True
+
+
+@mark.integration
+@mark.slow
+def test_check_many_uses_one_postgres_snapshot_for_the_batch(postgres_pool: ConnectionPool) -> None:
+    """Test that a tuple committed mid-batch is invisible to every request in that batch."""
+    store = PostgresTupleStore(cast(Any, postgres_pool))
+    evaluator = Evaluator(
+        model=CompiledModel(
+            types={
+                "document": Type(
+                    name="document",
+                    relations={"owner": Relation(allowed_subject_types=("user",))},
+                    permissions={},
+                )
+            }
+        ),
+        store=store,
+    )
+    subject = DirectSubject(object=ObjectReference(type="user", id="alice"))
+    first = ObjectReference(type="document", id="42")
+    second = ObjectReference(type="document", id="43")
+
+    assert evaluator.check_many(cast(Any, _requests(store, subject, first, second))) == [False, False]
+    assert evaluator.check(subject, "owner", second) is True
 
 
 @mark.integration

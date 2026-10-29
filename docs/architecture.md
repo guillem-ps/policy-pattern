@@ -376,11 +376,24 @@ snapshots can never mix inside one `check()` (per `semantics.md`'s
 snapshot-consistency requirement).
 
 `check_many()` opens that same single `View` once for a whole batch and
-shares one `EvaluationContext` across every request in it — so the memo and
-all three budget counters accumulate over the batch rather than resetting
-per request. That sharing is the feature, not an optimization detail: it is
-why a sub-check several requests depend on is paid for once, and why a batch
-large enough to exhaust the budget raises instead of returning a short list.
+shares one `EvaluationContext` across every request in it — so the memo is
+shared, and `max_nodes` and `max_store_reads` accumulate over the batch
+rather than resetting per request. `max_depth` instead bounds
+the live cycle-detection frontier, `len(context.visited)`, which unwinds
+when each sub-check returns; it does not accumulate across requests. Sharing
+the context is the feature, not an optimization detail: it is why a sub-check
+several requests depend on is paid for once.
+
+Because the two accumulating limits span the batch, the caller has to account
+for batch size in `max_nodes` and `max_store_reads`, or split work across
+calls; `max_depth` remains a per-traversal bound. With the defaults
+(`max_depth=25`, `max_nodes=10_000`, `max_store_reads=1_000`),
+`max_store_reads` is the first likely limit to bind, though the model
+determines the actual cost. There is no partial-result mode, so exhausting
+any limit discards every decision for that batch, including ones already
+computed. For `PostgresTupleStore`, the same lifetime also holds a pool
+connection and a read-only transaction open; the transaction's old snapshot
+keeps `xmin` behind and can delay vacuum until the batch finishes.
 
 `EvaluationBudget` tracks more than depth alone: a wide-shallow graph (depth
 5, branching 100) can cost more than a deep-narrow one (depth 30, branching

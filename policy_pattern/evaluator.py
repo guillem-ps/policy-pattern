@@ -25,7 +25,11 @@ from .ports import TupleStore, View
 @dataclass(frozen=True, slots=True)
 class EvaluationBudget:
     """
-    Per-`check()` resource limits.
+    Resource limits for one `check()` or `check_many()` call.
+
+    `max_nodes` and `max_store_reads` accumulate across a `check_many()` call.
+    `max_depth` bounds the live `context.visited` frontier and resets as each
+    request finishes, so it does not accumulate across the batch.
 
     No `__post_init__` validation — a degenerate value (e.g. `max_depth=0`)
     is well-defined without a guard: it simply fails on the first node
@@ -36,16 +40,16 @@ class EvaluationBudget:
         EvaluationBudget(max_depth=10, max_nodes=500, max_store_reads=100)
     """
 
-    # Maximum recursion depth for a single `check()` call. Each recursive call
+    # Maximum recursion depth for one call. Each recursive call
     # to `_check_name()` adds one to the depth; exceeding this limit raises an
     # `EvaluationError`.
     max_depth: int = 25
 
-    # Maximum number of nodes visited during a single `check()` call. Each
+    # Maximum number of nodes visited during one call. Each
     # call to `_check_name()` increments this count; exceeding this limit raises an `EvaluationError`.
     max_nodes: int = 10_000
 
-    # Maximum number of store reads during a single `check()` call. Each call
+    # Maximum number of store reads during one call. Each call
     # to `_charge_read()` increments this count; exceeding this limit raises an `EvaluationError`.
     max_store_reads: int = 1_000
 
