@@ -26,13 +26,14 @@ from policy_pattern.models import (
     PermissionExpression,
     Reference,
     Relation,
+    Subject,
     SubjectSet,
     Tuple,
     TupleToUserset,
     Type,
     Union,
 )
-from policy_pattern.ports import TupleStore, View
+from policy_pattern.ports import ReadResult, TupleStore, View
 
 
 def _chain(prefix: str, length: int) -> list[ObjectReference]:
@@ -181,6 +182,81 @@ class _SnapshotCountingStore(TupleStore):
         self.snapshot_count += 1
         with self._inner.snapshot() as view:
             yield view
+
+
+class _ReadCountingStore(TupleStore):
+    """
+    A TupleStore wrapper that counts every read_tuple()/read_relation() call
+    issued through its snapshot's View, across the view's whole lifetime.
+    """
+
+    def __init__(self, inner: TupleStore) -> None:
+        self._inner = inner
+        self.read_count = 0
+
+    @override
+    def write_tuples(self, mutation: Mutation) -> None:
+        self._inner.write_tuples(mutation)
+
+    @override
+    @contextmanager
+    def snapshot(self) -> Generator[View, None, None]:
+        with self._inner.snapshot() as view:
+            yield _ReadCountingView(view, self)
+
+
+class _ReadCountingView(View):
+    def __init__(self, inner: View, store: "_ReadCountingStore") -> None:
+        self._inner = inner
+        self._store = store
+
+    @override
+    def read_tuple(self, subject: Subject, relation: str, object: ObjectReference) -> bool:
+        self._store.read_count += 1
+        return self._inner.read_tuple(subject, relation, object)
+
+    @override
+    def read_relation(self, object: ObjectReference, relation: str, limit: int) -> ReadResult:
+        self._store.read_count += 1
+        return self._inner.read_relation(object, relation, limit)
+
+
+@mark.unit
+def test_check_many_shares_memo_across_requests() -> None:
+    """
+    Test that a sub-check shared by several requests is paid for once,
+    counted directly rather than inferred from a budget threshold — a
+    budget-based assertion is unsound here: a fresh per-request context
+    also resets the budget counter, so no error fires either way and the
+    decisions come out identical regardless of memo sharing.
+    """
+    model = CompiledModel(
+        types={
+            "folder": Type(
+                name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+            "document": Type(
+                name="document",
+                relations={"parent": Relation(allowed_subject_types=("folder",))},
+                permissions={"can_view": TupleToUserset(tupleset="parent", computed="viewer")},
+            ),
+        }
+    )
+    inner = MemoryTupleStore()
+    root = _folder("root")
+    docs = [ObjectReference(type="document", id=str(i)) for i in range(3)]
+    alice = _direct("alice")
+    additions = {Tuple(subject=alice, relation="viewer", object=root)}
+    for d in docs:
+        additions.add(Tuple(subject=DirectSubject(object=root), relation="parent", object=d))
+    inner.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
+    store = _ReadCountingStore(inner)
+    evaluator = Evaluator(model=model, store=store)
+
+    requests = [(alice, "can_view", d) for d in docs]
+
+    assert evaluator.check_many(requests) == [True, True, True]
+    assert store.read_count == 4
 
 
 @mark.unit
@@ -1111,40 +1187,3 @@ def test_check_many_opens_exactly_one_snapshot() -> None:
     evaluator.check_many([(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")])
 
     assert store.snapshot_count == 1
-
-
-@mark.unit
-def test_check_many_shares_memo_across_requests() -> None:
-    """
-    Test that a sub-check shared by several requests is paid for once:
-    three documents under the same parent folder need 3 reads to resolve
-    `parent` (one per document, unavoidable) plus exactly 1 read for the
-    folder's `viewer` check — reused via memo for the other two documents.
-    A budget of 4 only works if that reuse happens; without a shared
-    memo it would need 6 (3 + 3) and raise.
-    """
-    model = CompiledModel(
-        types={
-            "folder": Type(
-                name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={}
-            ),
-            "document": Type(
-                name="document",
-                relations={"parent": Relation(allowed_subject_types=("folder",))},
-                permissions={"can_view": TupleToUserset(tupleset="parent", computed="viewer")},
-            ),
-        }
-    )
-    store = MemoryTupleStore()
-    root = _folder("root")
-    docs = [ObjectReference(type="document", id=str(i)) for i in range(3)]
-    alice = _direct("alice")
-    additions = {Tuple(subject=alice, relation="viewer", object=root)}
-    for d in docs:
-        additions.add(Tuple(subject=DirectSubject(object=root), relation="parent", object=d))
-    store.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
-    evaluator = Evaluator(model=model, store=store)
-
-    requests = [(alice, "can_view", d) for d in docs]
-
-    assert evaluator.check_many(requests, budget=EvaluationBudget(max_store_reads=4)) == [True, True, True]
