@@ -170,3 +170,20 @@ def test_type_not_hashable() -> None:
 
     with raises(TypeError):
         hash(type_)
+
+
+@mark.unit
+def test_type_permissions_copies_caller_dict() -> None:
+    """
+    Test that mutating the original dict passed in does not affect the constructed Type.
+
+    Same reasoning as test_type_relations_copies_caller_dict, for the permissions mapping.
+    """
+    original = {"view": Reference(name="owner")}
+    type_ = Type(name="document", relations={}, permissions=original)
+
+    original["edit"] = Reference(name="client")
+
+    assert "edit" not in type_.permissions
+    assert "view" in type_.permissions
+    assert type_.permissions["view"] == Reference(name="owner")
