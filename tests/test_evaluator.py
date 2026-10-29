@@ -35,6 +35,13 @@ from policy_pattern.models import (
 from policy_pattern.ports import TupleStore, View
 
 
+def _chain(prefix: str, length: int) -> list[ObjectReference]:
+    """
+    Create a chain of ObjectReferences with IDs prefixed by `prefix` and numbered from 0 to `length - 1`.
+    """
+    return [_group(f"{prefix}{i}") for i in range(length)]
+
+
 @mark.unit
 def test_evaluation_budget_default_values() -> None:
     """
@@ -428,6 +435,34 @@ def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
 
     with raises(EvaluationError):
         evaluator.check(_direct("alice"), "member", chain[0], budget=EvaluationBudget(max_nodes=2, max_depth=100))
+
+
+@mark.unit
+def test_check_many_max_depth_resets_between_requests() -> None:
+    """
+    Test that max_depth bounds each request's own traversal, not the batch:
+    two independent chains each exactly at the depth limit both succeed in
+    one batch — if max_depth accumulated like max_nodes/max_store_reads,
+    the second request would exceed it and raise.
+    """
+    model = _group_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+
+    chain_a = _chain("a", 2)
+    chain_b = _chain("b", 2)
+
+    additions: set[Tuple] = set()
+
+    for chain in (chain_a, chain_b):
+        additions.add(Tuple(subject=SubjectSet(object=chain[1], relation="member"), relation="member", object=chain[0]))
+        additions.add(Tuple(subject=alice, relation="member", object=chain[1]))
+
+    store.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
+    evaluator = Evaluator(model=model, store=store)
+
+    requests = [(alice, "member", chain_a[0]), (alice, "member", chain_b[0])]
+    assert evaluator.check_many(requests, budget=EvaluationBudget(max_depth=2)) == [True, True]
 
 
 @mark.unit
