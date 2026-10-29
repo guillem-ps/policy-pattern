@@ -16,14 +16,7 @@ from policy_pattern.adapters.memory import (
 )
 from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
 from policy_pattern.ports import ReadResult
-
-
-def _make_tuple(id_: str) -> Tuple:
-    return Tuple(
-        subject=DirectSubject(object=ObjectReference(type="user", id=id_)),
-        relation="owner",
-        object=ObjectReference(type="document", id="42"),
-    )
+from tests.tuples_factory import make_tuple
 
 
 @mark.unit
@@ -31,7 +24,7 @@ def test_cannot_set_tuples_directly_into_memory_view() -> None:
     """
     Test that the _tuples attribute of a MemoryTupleStore is private and cannot be set directly.
     """
-    memory_view = _MemoryView(frozenset({_make_tuple("alice")}))
+    memory_view = _MemoryView(frozenset({make_tuple("alice")}))
 
     with raises(AttributeError):
         memory_view.tuples = frozenset()  # pyright: ignore[reportAttributeAccessIssue] # ty: ignore[invalid-assignment]
@@ -43,7 +36,7 @@ def test_read_after_write() -> None:
     Test that a snapshot taken after write_tuples() observes the written tuple.
     """
     store = MemoryTupleStore()
-    tuple_ = _make_tuple("alice")
+    tuple_ = make_tuple("alice")
 
     store.write_tuples(Mutation(additions=frozenset({tuple_}), deletions=frozenset()))
 
@@ -57,7 +50,7 @@ def test_read_relation_returns_complete_when_matches_at_or_under_limit() -> None
     Test that read_relation() reports complete=True when matches are within the limit.
     """
     store = MemoryTupleStore()
-    tuples = frozenset({_make_tuple("alice"), _make_tuple("bob")})
+    tuples = frozenset({make_tuple("alice"), make_tuple("bob")})
     store.write_tuples(Mutation(additions=tuples, deletions=frozenset()))
 
     with store.snapshot() as view:
@@ -73,7 +66,7 @@ def test_read_relation_truncates_exactly_at_limit() -> None:
     Test that read_relation() reports complete=False and returns exactly `limit` tuples when more exist.
     """
     store = MemoryTupleStore()
-    all_tuples = frozenset({_make_tuple(name) for name in ("alice", "bob", "carol")})
+    all_tuples = frozenset({make_tuple(name) for name in ("alice", "bob", "carol")})
     store.write_tuples(Mutation(additions=all_tuples, deletions=frozenset()))
 
     with store.snapshot() as view:
@@ -93,7 +86,7 @@ def test_read_relation_truncation_is_deterministic() -> None:
     truncation vary between runs with identical data.
     """
     store = MemoryTupleStore()
-    all_tuples = frozenset({_make_tuple(name) for name in ("alice", "bob", "carol", "dave", "eve")})
+    all_tuples = frozenset({make_tuple(name) for name in ("alice", "bob", "carol", "dave", "eve")})
     store.write_tuples(Mutation(additions=all_tuples, deletions=frozenset()))
 
     with store.snapshot() as view:
@@ -109,7 +102,7 @@ def test_read_relation_with_limit_zero_reports_incomplete_when_matches_exist() -
     Test that limit=0 is well-defined: any match makes the result immediately incomplete, never a crash.
     """
     store = MemoryTupleStore()
-    store.write_tuples(Mutation(additions=frozenset({_make_tuple("alice")}), deletions=frozenset()))
+    store.write_tuples(Mutation(additions=frozenset({make_tuple("alice")}), deletions=frozenset()))
 
     with store.snapshot() as view:
         result = view.read_relation(ObjectReference(type="document", id="42"), "owner", limit=0)

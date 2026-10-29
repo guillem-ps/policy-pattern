@@ -2,14 +2,11 @@
 Test module for evaluator.py.
 """
 
-from collections.abc import Generator
-from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
 from os import environ
 from pathlib import Path
 from subprocess import run
 from sys import executable
-from typing import override
 
 from pytest import mark, raises
 
@@ -26,14 +23,72 @@ from policy_pattern.models import (
     PermissionExpression,
     Reference,
     Relation,
-    Subject,
     SubjectSet,
     Tuple,
     TupleToUserset,
     Type,
     Union,
 )
-from policy_pattern.ports import ReadResult, TupleStore, View
+from tests.mother_classes import ReadCountingStore, SnapshotCountingStore
+
+
+def _direct(id_: str) -> DirectSubject:
+    """
+    Create a DirectSubject for the given user ID.
+    """
+    return DirectSubject(object=ObjectReference(type="user", id=id_))
+
+
+def _group(id_: str) -> ObjectReference:
+    """
+    Create an ObjectReference for a group with the given ID.
+    """
+    return ObjectReference(type="group", id=id_)
+
+
+def _group_model() -> CompiledModel:
+    """
+    Create a CompiledModel with a single group type.
+    The group type has a "member" relation that allows subjects of type "user" or "group#member".
+    """
+    return CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
+                permissions={},
+            ),
+        }
+    )
+
+
+def _document(id_: str) -> ObjectReference:
+    return ObjectReference(type="document", id=id_)
+
+
+def _document_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "document" type that has "owner", "editor",
+    and "blocked" relations, and "viewer", "manager", and "restricted_viewer"
+    permissions.
+    """
+    return CompiledModel(
+        types={
+            "document": Type(
+                name="document",
+                relations={
+                    "owner": Relation(allowed_subject_types=("user",)),
+                    "editor": Relation(allowed_subject_types=("user",)),
+                    "blocked": Relation(allowed_subject_types=("user",)),
+                },
+                permissions={
+                    "viewer": Union(left=Reference(name="owner"), right=Reference(name="editor")),
+                    "manager": Intersection(left=Reference(name="owner"), right=Reference(name="editor")),
+                    "restricted_viewer": Exclusion(include=Reference(name="owner"), exclude=Reference(name="blocked")),
+                },
+            ),
+        }
+    )
 
 
 def _chain(prefix: str, length: int) -> list[ObjectReference]:
@@ -41,6 +96,41 @@ def _chain(prefix: str, length: int) -> list[ObjectReference]:
     Create a chain of ObjectReferences with IDs prefixed by `prefix` and numbered from 0 to `length - 1`.
     """
     return [_group(f"{prefix}{i}") for i in range(length)]
+
+
+def _chain_of_groups(length: int) -> list[ObjectReference]:
+    return [_group(str(i)) for i in range(length)]
+
+
+def _folder(id_: str) -> ObjectReference:
+    """
+    Return an ObjectReference of type "folder" with the given id.
+    """
+    return ObjectReference(type="folder", id=id_)
+
+
+def _folder_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "folder" type that has a "viewer" relation and an "inherited_viewer" permission that
+    uses TupleToUserset to inherit viewers from its parent folder.
+    """
+    return CompiledModel(
+        types={
+            "folder": Type(
+                name="folder",
+                relations={
+                    "viewer": Relation(allowed_subject_types=("user",)),
+                    "parent": Relation(allowed_subject_types=("folder",)),
+                },
+                permissions={
+                    "inherited_viewer": Union(
+                        left=Reference(name="viewer"),
+                        right=TupleToUserset(tupleset="parent", computed="inherited_viewer"),
+                    ),
+                },
+            ),
+        }
+    )
 
 
 @mark.unit
@@ -127,100 +217,6 @@ def test_evaluation_context_is_mutable() -> None:
         assert context.store_read_count == 1
 
 
-def _direct(id_: str) -> DirectSubject:
-    """
-    Create a DirectSubject for the given user ID.
-    """
-    return DirectSubject(object=ObjectReference(type="user", id=id_))
-
-
-def _group(id_: str) -> ObjectReference:
-    """
-    Create an ObjectReference for a group with the given ID.
-    """
-    return ObjectReference(type="group", id=id_)
-
-
-def _group_model() -> CompiledModel:
-    """
-    Create a CompiledModel with a single group type.
-    The group type has a "member" relation that allows subjects of type "user" or "group#member".
-    """
-    return CompiledModel(
-        types={
-            "group": Type(
-                name="group",
-                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
-                permissions={},
-            ),
-        }
-    )
-
-
-class _SnapshotCountingStore(TupleStore):
-    """
-    A TupleStore wrapper that counts how many times snapshot() is called.
-    """
-
-    def __init__(self, inner: TupleStore) -> None:
-        self._inner = inner
-        self.snapshot_count = 0
-
-    @override
-    def write_tuples(self, mutation: Mutation) -> None:
-        """
-        Write tuples to the inner store.
-        """
-        self._inner.write_tuples(mutation)
-
-    @override
-    @contextmanager
-    def snapshot(self) -> Generator[View, None, None]:
-        """
-        Open a snapshot of the inner store and increment the snapshot count.
-        """
-        self.snapshot_count += 1
-        with self._inner.snapshot() as view:
-            yield view
-
-
-class _ReadCountingStore(TupleStore):
-    """
-    A TupleStore wrapper that counts every read_tuple()/read_relation() call
-    issued through its snapshot's View, across the view's whole lifetime.
-    """
-
-    def __init__(self, inner: TupleStore) -> None:
-        self._inner = inner
-        self.read_count = 0
-
-    @override
-    def write_tuples(self, mutation: Mutation) -> None:
-        self._inner.write_tuples(mutation)
-
-    @override
-    @contextmanager
-    def snapshot(self) -> Generator[View, None, None]:
-        with self._inner.snapshot() as view:
-            yield _ReadCountingView(view, self)
-
-
-class _ReadCountingView(View):
-    def __init__(self, inner: View, store: "_ReadCountingStore") -> None:
-        self._inner = inner
-        self._store = store
-
-    @override
-    def read_tuple(self, subject: Subject, relation: str, object: ObjectReference) -> bool:
-        self._store.read_count += 1
-        return self._inner.read_tuple(subject, relation, object)
-
-    @override
-    def read_relation(self, object: ObjectReference, relation: str, limit: int) -> ReadResult:
-        self._store.read_count += 1
-        return self._inner.read_relation(object, relation, limit)
-
-
 @mark.unit
 def test_check_many_shares_memo_across_requests() -> None:
     """
@@ -250,7 +246,7 @@ def test_check_many_shares_memo_across_requests() -> None:
     for d in docs:
         additions.add(Tuple(subject=DirectSubject(object=root), relation="parent", object=d))
     inner.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
-    store = _ReadCountingStore(inner)
+    store = ReadCountingStore(inner)
     evaluator = Evaluator(model=model, store=store)
 
     requests = [(alice, "can_view", d) for d in docs]
@@ -463,10 +459,6 @@ def test_check_relation_userset_expansion_order_is_deterministic_across_processe
     }
 
     assert len(set(outputs.values())) == 1, outputs
-
-
-def _chain_of_groups(length: int) -> list[ObjectReference]:
-    return [_group(str(i)) for i in range(length)]
 
 
 @mark.unit
@@ -682,41 +674,12 @@ def test_check_opens_exactly_one_snapshot() -> None:
             deletions=frozenset(),
         )
     )
-    store = _SnapshotCountingStore(inner)
+    store = SnapshotCountingStore(inner)
     evaluator = Evaluator(model=model, store=store)
 
     evaluator.check(_direct("alice"), "member", group_a)
 
     assert store.snapshot_count == 1
-
-
-def _document(id_: str) -> ObjectReference:
-    return ObjectReference(type="document", id=id_)
-
-
-def _document_model() -> CompiledModel:
-    """
-    Return a CompiledModel with a "document" type that has "owner", "editor",
-    and "blocked" relations, and "viewer", "manager", and "restricted_viewer"
-    permissions.
-    """
-    return CompiledModel(
-        types={
-            "document": Type(
-                name="document",
-                relations={
-                    "owner": Relation(allowed_subject_types=("user",)),
-                    "editor": Relation(allowed_subject_types=("user",)),
-                    "blocked": Relation(allowed_subject_types=("user",)),
-                },
-                permissions={
-                    "viewer": Union(left=Reference(name="owner"), right=Reference(name="editor")),
-                    "manager": Intersection(left=Reference(name="owner"), right=Reference(name="editor")),
-                    "restricted_viewer": Exclusion(include=Reference(name="owner"), exclude=Reference(name="blocked")),
-                },
-            ),
-        }
-    )
 
 
 @mark.unit
@@ -917,37 +880,6 @@ def test_check_permission_unknown_expression_type_raises() -> None:
             evaluator._check_permission(alice, PermissionExpression(), document, context)  # pyright: ignore[reportPrivateUsage]
 
     assert exc_info.value.message == "unknown expression type 'PermissionExpression'"
-
-
-def _folder(id_: str) -> ObjectReference:
-    """
-    Return an ObjectReference of type "folder" with the given id.
-    """
-    return ObjectReference(type="folder", id=id_)
-
-
-def _folder_model() -> CompiledModel:
-    """
-    Return a CompiledModel with a "folder" type that has a "viewer" relation and an "inherited_viewer" permission that
-    uses TupleToUserset to inherit viewers from its parent folder.
-    """
-    return CompiledModel(
-        types={
-            "folder": Type(
-                name="folder",
-                relations={
-                    "viewer": Relation(allowed_subject_types=("user",)),
-                    "parent": Relation(allowed_subject_types=("folder",)),
-                },
-                permissions={
-                    "inherited_viewer": Union(
-                        left=Reference(name="viewer"),
-                        right=TupleToUserset(tupleset="parent", computed="inherited_viewer"),
-                    ),
-                },
-            ),
-        }
-    )
 
 
 @mark.unit
@@ -1181,7 +1113,7 @@ def test_check_many_opens_exactly_one_snapshot() -> None:
                 deletions=frozenset(),
             )
         )
-    store = _SnapshotCountingStore(inner)
+    store = SnapshotCountingStore(inner)
     evaluator = Evaluator(model=model, store=store)
 
     evaluator.check_many([(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")])
