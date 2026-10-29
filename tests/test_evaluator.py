@@ -98,10 +98,6 @@ def _chain(prefix: str, length: int) -> list[ObjectReference]:
     return [_group(f"{prefix}{i}") for i in range(length)]
 
 
-def _chain_of_groups(length: int) -> list[ObjectReference]:
-    return [_group(str(i)) for i in range(length)]
-
-
 def _folder(id_: str) -> ObjectReference:
     """
     Return an ObjectReference of type "folder" with the given id.
@@ -468,7 +464,7 @@ def test_check_relation_max_depth_exceeded_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
@@ -492,7 +488,7 @@ def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
@@ -564,7 +560,7 @@ def test_check_relation_max_store_reads_exceeded_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
