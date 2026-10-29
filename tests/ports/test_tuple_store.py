@@ -6,18 +6,10 @@ from dataclasses import FrozenInstanceError
 
 from pytest import mark, raises
 
-from policy_pattern.models import DirectSubject, Mutation, ObjectReference, Tuple
+from policy_pattern.models import Mutation
 from policy_pattern.ports.tuple_store import ReadResult, TupleStore, View
-
-from ..mother_classes import MotherTupleStore
-
-
-def _make_tuple(id_: str) -> Tuple:
-    return Tuple(
-        subject=DirectSubject(object=ObjectReference(type="user", id=id_)),
-        relation="owner",
-        object=ObjectReference(type="document", id="42"),
-    )
+from tests.mother_classes import MotherTupleStore
+from tests.tuples_factory import make_tuple
 
 
 @mark.unit
@@ -25,7 +17,7 @@ def test_read_result_valid_construction() -> None:
     """
     Test that a valid ReadResult can be constructed without raising an error.
     """
-    tuples = frozenset({_make_tuple("alice")})
+    tuples = frozenset({make_tuple("alice")})
     result = ReadResult(tuples=tuples, complete=True)
     assert result.tuples == tuples
     assert result.complete is True
@@ -36,7 +28,7 @@ def test_read_result_equality() -> None:
     """
     Test that two ReadResult instances with the same fields are equal.
     """
-    tuples = frozenset({_make_tuple("alice")})
+    tuples = frozenset({make_tuple("alice")})
     assert ReadResult(tuples=tuples, complete=True) == ReadResult(tuples=tuples, complete=True)
 
 
@@ -45,8 +37,8 @@ def test_read_result_inequality_different_tuples() -> None:
     """
     Test that two ReadResult instances with different tuples are not equal.
     """
-    assert ReadResult(tuples=frozenset({_make_tuple("alice")}), complete=True) != ReadResult(
-        tuples=frozenset({_make_tuple("bob")}), complete=True
+    assert ReadResult(tuples=frozenset({make_tuple("alice")}), complete=True) != ReadResult(
+        tuples=frozenset({make_tuple("bob")}), complete=True
     )
 
 
@@ -55,7 +47,7 @@ def test_read_result_inequality_different_complete() -> None:
     """
     Test that two ReadResult instances with a different complete flag are not equal.
     """
-    tuples = frozenset({_make_tuple("alice")})
+    tuples = frozenset({make_tuple("alice")})
     assert ReadResult(tuples=tuples, complete=True) != ReadResult(tuples=tuples, complete=False)
 
 
@@ -64,7 +56,7 @@ def test_read_result_hash_consistency() -> None:
     """
     Test that equal ReadResult instances have the same hash value.
     """
-    tuples = frozenset({_make_tuple("alice")})
+    tuples = frozenset({make_tuple("alice")})
     assert hash(ReadResult(tuples=tuples, complete=True)) == hash(ReadResult(tuples=tuples, complete=True))
 
 
@@ -109,7 +101,7 @@ def test_delete_tuples_calls_write_tuples_with_deletion_only_mutation() -> None:
     a concrete method every adapter gets for free, built on top of it.
     """
     store = MotherTupleStore()
-    tuple_ = _make_tuple("alice")
+    tuple_ = make_tuple("alice")
 
     store.delete_tuples(frozenset({tuple_}))
 

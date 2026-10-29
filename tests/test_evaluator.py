@@ -2,14 +2,11 @@
 Test module for evaluator.py.
 """
 
-from collections.abc import Generator
-from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
 from os import environ
 from pathlib import Path
 from subprocess import run
 from sys import executable
-from typing import override
 
 from pytest import mark, raises
 
@@ -32,7 +29,104 @@ from policy_pattern.models import (
     Type,
     Union,
 )
-from policy_pattern.ports import TupleStore, View
+from tests.mother_classes import ReadCountingStore, SnapshotCountingStore
+
+
+def _direct(id_: str) -> DirectSubject:
+    """
+    Create a DirectSubject for the given user ID.
+    """
+    return DirectSubject(object=ObjectReference(type="user", id=id_))
+
+
+def _group(id_: str) -> ObjectReference:
+    """
+    Create an ObjectReference for a group with the given ID.
+    """
+    return ObjectReference(type="group", id=id_)
+
+
+def _group_model() -> CompiledModel:
+    """
+    Create a CompiledModel with a single group type.
+    The group type has a "member" relation that allows subjects of type "user" or "group#member".
+    """
+    return CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
+                permissions={},
+            ),
+        }
+    )
+
+
+def _document(id_: str) -> ObjectReference:
+    return ObjectReference(type="document", id=id_)
+
+
+def _document_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "document" type that has "owner", "editor",
+    and "blocked" relations, and "viewer", "manager", and "restricted_viewer"
+    permissions.
+    """
+    return CompiledModel(
+        types={
+            "document": Type(
+                name="document",
+                relations={
+                    "owner": Relation(allowed_subject_types=("user",)),
+                    "editor": Relation(allowed_subject_types=("user",)),
+                    "blocked": Relation(allowed_subject_types=("user",)),
+                },
+                permissions={
+                    "viewer": Union(left=Reference(name="owner"), right=Reference(name="editor")),
+                    "manager": Intersection(left=Reference(name="owner"), right=Reference(name="editor")),
+                    "restricted_viewer": Exclusion(include=Reference(name="owner"), exclude=Reference(name="blocked")),
+                },
+            ),
+        }
+    )
+
+
+def _chain(prefix: str, length: int) -> list[ObjectReference]:
+    """
+    Create a chain of ObjectReferences with IDs prefixed by `prefix` and numbered from 0 to `length - 1`.
+    """
+    return [_group(f"{prefix}{i}") for i in range(length)]
+
+
+def _folder(id_: str) -> ObjectReference:
+    """
+    Return an ObjectReference of type "folder" with the given id.
+    """
+    return ObjectReference(type="folder", id=id_)
+
+
+def _folder_model() -> CompiledModel:
+    """
+    Return a CompiledModel with a "folder" type that has a "viewer" relation and an "inherited_viewer" permission that
+    uses TupleToUserset to inherit viewers from its parent folder.
+    """
+    return CompiledModel(
+        types={
+            "folder": Type(
+                name="folder",
+                relations={
+                    "viewer": Relation(allowed_subject_types=("user",)),
+                    "parent": Relation(allowed_subject_types=("folder",)),
+                },
+                permissions={
+                    "inherited_viewer": Union(
+                        left=Reference(name="viewer"),
+                        right=TupleToUserset(tupleset="parent", computed="inherited_viewer"),
+                    ),
+                },
+            ),
+        }
+    )
 
 
 @mark.unit
@@ -119,41 +213,42 @@ def test_evaluation_context_is_mutable() -> None:
         assert context.store_read_count == 1
 
 
-def _direct(id_: str) -> DirectSubject:
-    return DirectSubject(object=ObjectReference(type="user", id=id_))
-
-
-def _group(id_: str) -> ObjectReference:
-    return ObjectReference(type="group", id=id_)
-
-
-def _group_model() -> CompiledModel:
-    return CompiledModel(
+@mark.unit
+def test_check_many_shares_memo_across_requests() -> None:
+    """
+    Test that a sub-check shared by several requests is paid for once,
+    counted directly rather than inferred from a budget threshold — a
+    budget-based assertion is unsound here: a fresh per-request context
+    also resets the budget counter, so no error fires either way and the
+    decisions come out identical regardless of memo sharing.
+    """
+    model = CompiledModel(
         types={
-            "group": Type(
-                name="group",
-                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
-                permissions={},
+            "folder": Type(
+                name="folder", relations={"viewer": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+            "document": Type(
+                name="document",
+                relations={"parent": Relation(allowed_subject_types=("folder",))},
+                permissions={"can_view": TupleToUserset(tupleset="parent", computed="viewer")},
             ),
         }
     )
+    inner = MemoryTupleStore()
+    root = _folder("root")
+    docs = [ObjectReference(type="document", id=str(i)) for i in range(3)]
+    alice = _direct("alice")
+    additions = {Tuple(subject=alice, relation="viewer", object=root)}
+    for d in docs:
+        additions.add(Tuple(subject=DirectSubject(object=root), relation="parent", object=d))
+    inner.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
+    store = ReadCountingStore(inner)
+    evaluator = Evaluator(model=model, store=store)
 
+    requests = [(alice, "can_view", d) for d in docs]
 
-class _SnapshotCountingStore(TupleStore):
-    def __init__(self, inner: TupleStore) -> None:
-        self._inner = inner
-        self.snapshot_count = 0
-
-    @override
-    def write_tuples(self, mutation: Mutation) -> None:
-        self._inner.write_tuples(mutation)
-
-    @override
-    @contextmanager
-    def snapshot(self) -> Generator[View, None, None]:
-        self.snapshot_count += 1
-        with self._inner.snapshot() as view:
-            yield view
+    assert evaluator.check_many(requests) == [True, True, True]
+    assert store.read_count == 4
 
 
 @mark.unit
@@ -362,10 +457,6 @@ def test_check_relation_userset_expansion_order_is_deterministic_across_processe
     assert len(set(outputs.values())) == 1, outputs
 
 
-def _chain_of_groups(length: int) -> list[ObjectReference]:
-    return [_group(str(i)) for i in range(length)]
-
-
 @mark.unit
 def test_check_relation_max_depth_exceeded_raises() -> None:
     """
@@ -373,7 +464,7 @@ def test_check_relation_max_depth_exceeded_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
@@ -397,7 +488,7 @@ def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
@@ -408,6 +499,34 @@ def test_check_relation_max_nodes_exceeded_via_node_count_raises() -> None:
 
     with raises(EvaluationError):
         evaluator.check(_direct("alice"), "member", chain[0], budget=EvaluationBudget(max_nodes=2, max_depth=100))
+
+
+@mark.unit
+def test_check_many_max_depth_resets_between_requests() -> None:
+    """
+    Test that max_depth bounds each request's own traversal, not the batch:
+    two independent chains each exactly at the depth limit both succeed in
+    one batch — if max_depth accumulated like max_nodes/max_store_reads,
+    the second request would exceed it and raise.
+    """
+    model = _group_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+
+    chain_a = _chain("a", 2)
+    chain_b = _chain("b", 2)
+
+    additions: set[Tuple] = set()
+
+    for chain in (chain_a, chain_b):
+        additions.add(Tuple(subject=SubjectSet(object=chain[1], relation="member"), relation="member", object=chain[0]))
+        additions.add(Tuple(subject=alice, relation="member", object=chain[1]))
+
+    store.write_tuples(Mutation(additions=frozenset(additions), deletions=frozenset()))
+    evaluator = Evaluator(model=model, store=store)
+
+    requests = [(alice, "member", chain_a[0]), (alice, "member", chain_b[0])]
+    assert evaluator.check_many(requests, budget=EvaluationBudget(max_depth=2)) == [True, True]
 
 
 @mark.unit
@@ -441,7 +560,7 @@ def test_check_relation_max_store_reads_exceeded_raises() -> None:
     """
     model = _group_model()
     store = MemoryTupleStore()
-    chain = _chain_of_groups(5)
+    chain = _chain("a", 5)
     additions = {
         Tuple(subject=SubjectSet(object=chain[i + 1], relation="member"), relation="member", object=chain[i])
         for i in range(len(chain) - 1)
@@ -551,36 +670,12 @@ def test_check_opens_exactly_one_snapshot() -> None:
             deletions=frozenset(),
         )
     )
-    store = _SnapshotCountingStore(inner)
+    store = SnapshotCountingStore(inner)
     evaluator = Evaluator(model=model, store=store)
 
     evaluator.check(_direct("alice"), "member", group_a)
 
     assert store.snapshot_count == 1
-
-
-def _document(id_: str) -> ObjectReference:
-    return ObjectReference(type="document", id=id_)
-
-
-def _document_model() -> CompiledModel:
-    return CompiledModel(
-        types={
-            "document": Type(
-                name="document",
-                relations={
-                    "owner": Relation(allowed_subject_types=("user",)),
-                    "editor": Relation(allowed_subject_types=("user",)),
-                    "blocked": Relation(allowed_subject_types=("user",)),
-                },
-                permissions={
-                    "viewer": Union(left=Reference(name="owner"), right=Reference(name="editor")),
-                    "manager": Intersection(left=Reference(name="owner"), right=Reference(name="editor")),
-                    "restricted_viewer": Exclusion(include=Reference(name="owner"), exclude=Reference(name="blocked")),
-                },
-            ),
-        }
-    )
 
 
 @mark.unit
@@ -638,7 +733,7 @@ def test_union_short_circuits_right_branch() -> None:
         result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is True
-        assert (document, "editor") not in context.memo
+        assert (alice, document, "editor") not in context.memo
 
 
 @mark.unit
@@ -680,8 +775,8 @@ def test_exclusion_always_evaluates_both_sides() -> None:
         result = evaluator._check_permission(alice, expression, document, context)  # pyright: ignore[reportPrivateUsage]
 
         assert result is False
-        assert (document, "owner") in context.memo
-        assert (document, "blocked") in context.memo
+        assert (alice, document, "owner") in context.memo
+        assert (alice, document, "blocked") in context.memo
 
 
 @mark.unit
@@ -783,30 +878,6 @@ def test_check_permission_unknown_expression_type_raises() -> None:
     assert exc_info.value.message == "unknown expression type 'PermissionExpression'"
 
 
-def _folder(id_: str) -> ObjectReference:
-    return ObjectReference(type="folder", id=id_)
-
-
-def _folder_model() -> CompiledModel:
-    return CompiledModel(
-        types={
-            "folder": Type(
-                name="folder",
-                relations={
-                    "viewer": Relation(allowed_subject_types=("user",)),
-                    "parent": Relation(allowed_subject_types=("folder",)),
-                },
-                permissions={
-                    "inherited_viewer": Union(
-                        left=Reference(name="viewer"),
-                        right=TupleToUserset(tupleset="parent", computed="inherited_viewer"),
-                    ),
-                },
-            ),
-        }
-    )
-
-
 @mark.unit
 def test_check_tuple_to_userset_traverses_parent() -> None:
     """
@@ -880,3 +951,167 @@ def test_check_tuple_to_userset_truncated_enumeration_raises() -> None:
 
     with raises(EvaluationError):
         evaluator.check(_direct("alice"), "inherited_viewer", child, budget=EvaluationBudget(max_nodes=4))
+
+
+@mark.unit
+def test_memo_is_not_shared_across_subjects() -> None:
+    """
+    Test that one EvaluationContext reused for two different subjects gives each its own decision.
+
+    The memo key is what this pins down. Keyed by `(object, name)` alone it
+    is safe only because a single `check()` call carries exactly one
+    subject, constant for the whole traversal — an invariant `check_many()`
+    is about to break by design. With the narrow key, alice's cached True
+    for `(document:42, "owner")` is handed straight back to bob, who owns
+    nothing: a false allow, the worst failure class this library has.
+
+    Reusing one context across two `_check_name` calls is exactly what a
+    batch does, which is why this reproduces the bug without `check_many()`
+    existing yet.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    bob = _direct("bob")
+
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    with store.snapshot() as view:
+        context = EvaluationContext(view=view, budget=EvaluationBudget())
+
+        assert evaluator._check_name(alice, "owner", document, context) is True  # pyright: ignore[reportPrivateUsage]
+        assert evaluator._check_name(bob, "owner", document, context) is False  # pyright: ignore[reportPrivateUsage]
+
+
+@mark.unit
+def test_check_many_different_subjects_do_not_share_memo() -> None:
+    """
+    Test that two different subjects checking the same (object, name) in one
+    batch each get their own correct answer, not a cached answer meant for
+    the other subject — the false-allow-class bug Task 1's key widening
+    exists to prevent.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    bob = _direct("bob")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    results = evaluator.check_many([(alice, "viewer", document), (bob, "viewer", document)])
+
+    assert results == [True, False]
+
+
+@mark.unit
+def test_check_many_preserves_order_and_duplicates() -> None:
+    """
+    Test that check_many() returns one bool per request, in input order,
+    including a repeated request.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    document = _document("42")
+    alice = _direct("alice")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+    requests = [
+        (alice, "viewer", document),
+        (_direct("bob"), "viewer", document),
+        (alice, "viewer", document),
+    ]
+
+    assert evaluator.check_many(requests) == [True, False, True]
+
+
+@mark.unit
+def test_check_many_budget_shared_across_requests() -> None:
+    """
+    Test that the budget's counters accumulate across the whole batch —
+    enough distinct, cheap requests still exhaust a small shared
+    max_store_reads, proving the budget isn't reissued per request.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    for doc_id in ("1", "2", "3"):
+        store.write_tuples(
+            Mutation(
+                additions=frozenset({Tuple(subject=alice, relation="owner", object=_document(doc_id))}),
+                deletions=frozenset(),
+            )
+        )
+    evaluator = Evaluator(model=model, store=store)
+    requests = [(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")]
+
+    with raises(EvaluationError):
+        evaluator.check_many(requests, budget=EvaluationBudget(max_store_reads=2))
+
+
+@mark.unit
+def test_check_many_propagates_error_and_returns_nothing() -> None:
+    """
+    Test that an error on any request aborts check_many() entirely instead
+    of returning a partial list or swallowing the exception.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    evaluator = Evaluator(model=model, store=store)
+    requests = [
+        (alice, "viewer", _document("42")),
+        (alice, "viewer", ObjectReference(type="nonexistent", id="1")),
+    ]
+
+    with raises(UnknownTypeError):
+        evaluator.check_many(requests)
+
+
+@mark.unit
+def test_check_many_empty_requests_returns_empty_list() -> None:
+    """
+    Test that check_many([]) returns [] without raising.
+    """
+    model = _document_model()
+    store = MemoryTupleStore()
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.check_many([]) == []
+
+
+@mark.unit
+def test_check_many_opens_exactly_one_snapshot() -> None:
+    """
+    Test that a whole batch runs inside a single store.snapshot().
+
+    docs/semantics.md's snapshot-consistency requirement is per `check()`;
+    `check_many()` extends it to the batch, so a three-request batch must
+    not see three different views of the store. Counting snapshots is the
+    only observation that catches a per-request `snapshot()` — the
+    decisions themselves come out identical either way.
+    """
+    model = _document_model()
+    inner = MemoryTupleStore()
+    alice = _direct("alice")
+    for doc_id in ("1", "2", "3"):
+        inner.write_tuples(
+            Mutation(
+                additions=frozenset({Tuple(subject=alice, relation="owner", object=_document(doc_id))}),
+                deletions=frozenset(),
+            )
+        )
+    store = SnapshotCountingStore(inner)
+    evaluator = Evaluator(model=model, store=store)
+
+    evaluator.check_many([(alice, "owner", _document(doc_id)) for doc_id in ("1", "2", "3")])
+
+    assert store.snapshot_count == 1
