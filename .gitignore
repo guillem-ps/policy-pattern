@@ -12,6 +12,10 @@ index.txt
 ## Agents dirs
 **.claude**
 
+### Skills/plugins dirs
+**superpowers**
+**graphify-out**
+
 ## Python version file:
 .python-version
 

@@ -21,12 +21,7 @@ enough in practice.
 `code` is grep-able and documentable independent of message wording — a
 caller can match on `err.code` without parsing free text.
 
-Message format: interpolated values in `message`/`related` use Python's
-`!r` conversion (`f"identifier {value!r} is invalid"`), not a custom
-bracket convention — no automated hook enforces this, checked by hand on
-review.*
-
-In the future, it's necessary to automatise as a pre-commit hook, but for now, the human eye is enough.
+Message format — see [`CODE_STYLE.md`](../.github/CODE_STYLE.md) § Errors.
 
 ## Ranges
 
