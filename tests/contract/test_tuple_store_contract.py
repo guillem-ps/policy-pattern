@@ -63,6 +63,20 @@ def test_read_after_write(store: TupleStore) -> None:
 
 
 @mark.contract
+def test_subject_id_comparison_is_case_sensitive(store: TupleStore) -> None:
+    """
+    Test that identifiers differing only by case remain distinct.
+
+    """
+    tuple_ = _make_direct_tuple("Alice")
+    lowercase_subject = _make_direct_tuple("alice").subject
+    store.write_tuples(Mutation(additions=frozenset({tuple_}), deletions=frozenset()))
+
+    with store.snapshot() as view:
+        assert view.read_tuple(lowercase_subject, tuple_.relation, tuple_.object) is False
+
+
+@mark.contract
 def test_read_after_write_with_subject_set(store: TupleStore) -> None:
     """
     Test read-after-write for a SubjectSet-shaped tuple, not only DirectSubject.
