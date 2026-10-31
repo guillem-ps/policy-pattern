@@ -1,6 +1,6 @@
 [project]
 name = "policy-pattern"
-version = "0.4.0"
+version = "0.4.1"
 description = "A minimal, embeddable ReBAC authorization engine for Python, inspired by Google Zanzibar."
 readme = "README.md"
 authors = [
@@ -37,7 +37,7 @@ Repository = "https://github.com/guillem-ps/policy-pattern"
 Issues = "https://github.com/guillem-ps/policy-pattern/issues"
 
 [build-system]
-requires = ["uv_build>=0.11.16,<0.13.0"]
+requires = ["uv_build>=0.11.16,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
