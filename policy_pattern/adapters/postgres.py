@@ -268,7 +268,18 @@ class _PostgresView(View):
 
     @override
     def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
-        """Returns up to `limit` tuples whose subject exactly matches, in one query."""
+        """Returns up to `limit` tuples whose subject exactly matches, in one query.
+
+        Args:
+            subject (Subject): The exact subject to match.
+            limit (int): The maximum number of matching tuples to return.
+
+        Returns:
+            ReadResult: Matching tuples and whether the enumeration is complete.
+
+        Raises:
+            None: This method defines no exception of its own.
+        """
         subject_type, subject_id, subject_relation = decompose(subject)
         cursor: Cursor = self.connection.cursor()
         cursor.execute(

@@ -125,5 +125,15 @@ class View(ABC):
         Unlike `read_relation`, this is not filtered by relation name or
         object; callers needing narrower results filter returned tuples.
         See `ReadResult` for the `complete=False` contract.
+
+        Args:
+            subject (Subject): The exact subject to match.
+            limit (int): The maximum number of matching tuples to return.
+
+        Returns:
+            ReadResult: Matching tuples and whether the enumeration is complete.
+
+        Raises:
+            None: The abstract contract defines no exception of its own.
         """
         raise NotImplementedError

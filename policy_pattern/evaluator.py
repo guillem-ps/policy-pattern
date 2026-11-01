@@ -157,14 +157,30 @@ class Evaluator:
         candidate_ids: frozenset[ObjectReference] | None = None,
         budget: EvaluationBudget | None = None,
     ) -> frozenset[ObjectReference]:
-        """Returns objects of `object_type` on which `subject` holds `name`."""
+        """Returns objects of `object_type` on which `subject` holds `name`.
+
+        Args:
+            subject (Subject): The subject whose access is queried.
+            name (str): The relation or permission name to check.
+            object_type (str): The type of objects to return.
+            candidate_ids (frozenset[ObjectReference] | None): Optional objects to check instead of discovering them.
+            budget (EvaluationBudget | None): Resource limits for this evaluation.
+
+        Returns:
+            frozenset[ObjectReference]: Objects of `object_type` allowed by the forward check.
+
+        Raises:
+            EvaluationError: If reverse candidate discovery or a candidate check exhausts the evaluation budget.
+        """
         if budget is None:
             budget = EvaluationBudget()
+
         with self._store.snapshot() as view:
             context = EvaluationContext(view=view, budget=budget)
             candidates = (
                 self._reverse_candidates(subject, object_type, context) if candidate_ids is None else candidate_ids
             )
+
             return frozenset(
                 object
                 for object in sorted(candidates, key=repr)
@@ -174,7 +190,19 @@ class Evaluator:
     def _reverse_candidates(
         self, subject: Subject, object_type: str, context: EvaluationContext
     ) -> frozenset[ObjectReference]:
-        """Walk tuple subject edges to generate possible objects without interpreting permissions."""
+        """Walk tuple subject edges to generate possible objects without interpreting permissions.
+
+        Args:
+            subject (Subject): The starting subject for the reverse walk.
+            object_type (str): The type of candidate objects to return.
+            context (EvaluationContext): The shared view and resource-budget state.
+
+        Returns:
+            frozenset[ObjectReference]: Candidate objects of `object_type` reached by the tuple walk.
+
+        Raises:
+            EvaluationError: If `max_depth` or `max_nodes` is exceeded, or a subject-keyed enumeration is truncated.
+        """
         queue: deque[tuple[Subject, int]] = deque([(subject, 0)])
         visited: set[Subject] = {subject}
         candidates: set[ObjectReference] = set()
@@ -186,17 +214,20 @@ class Evaluator:
                     message=(f"max_depth={context.budget.max_depth!r} exceeded during reverse lookup from {current!r}"),
                     related=f"subject={current!r}",
                 )
+
             context.node_count += 1
             if context.node_count > context.budget.max_nodes:
                 raise EvaluationError(
                     message=f"max_nodes={context.budget.max_nodes!r} exceeded during reverse lookup",
                     related=f"subject={current!r}",
                 )
+
             self._charge_read(context, current.object, "list_objects")
             result = context.view.read_tuples_for_subject(
                 current,
                 limit=context.budget.max_nodes - context.node_count,
             )
+
             if not result.complete:
                 raise EvaluationError(
                     message=(f"enumeration for subject {current!r} truncated by remaining max_nodes budget"),
