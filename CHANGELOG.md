@@ -1,5 +1,182 @@
 # CHANGELOG
 
+<!-- version list -->
+
+## v0.4.1 (2026-10-31)
+
+### Build System
+
+- **deps**: Update dependencies of multiples components
+  ([`690cc38`](https://github.com/guillem-ps/policy-pattern/commit/690cc38e74f74562eb09ea90403bc8cf4593b2c4))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`cfa2ee6`](https://github.com/guillem-ps/policy-pattern/commit/cfa2ee63336e241cc8a213d4d6da2e27e2dbe16e))
+
+### Documentation
+
+- Add CODE_STYLE.md and TESTING.md, remove stale conventions
+  ([`25bf9ee`](https://github.com/guillem-ps/policy-pattern/commit/25bf9eea9a5a76655cdd301524f2ad1fc939b083))
+
+- Update .gitignore to include additional skills/plugins directories
+  ([`2322294`](https://github.com/guillem-ps/policy-pattern/commit/232229406497a2313ac2e4184d5ea01f190a2222))
+
+### Testing
+
+- Add test for permissions dict mutation in Type class
+  ([`bb350bf`](https://github.com/guillem-ps/policy-pattern/commit/bb350bf96469acaa3dfab45984b25e451cd03eae))
+
+
+## v0.4.0 (2026-10-29)
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`44f6484`](https://github.com/guillem-ps/policy-pattern/commit/44f6484015155db8393f785a4db647b7cb7d09ff))
+
+### Features
+
+- **evaluator**: Add check_many() for batch processing of authorization requests
+  ([`7c680fe`](https://github.com/guillem-ps/policy-pattern/commit/7c680feacb88aea4a9892c3c12511b4aca5ff7f2))
+
+- **evaluator**: Update EvaluationBudget to clarify resource limits for check_many() calls
+  ([`b00f3cd`](https://github.com/guillem-ps/policy-pattern/commit/b00f3cdfd2bd5beda7a6744545ad453297f30b11))
+
+- **tests**: Add tests for check_many() max_depth behavior in evaluator
+  ([`fe7b31a`](https://github.com/guillem-ps/policy-pattern/commit/fe7b31adfccb0b5936cc2e8ac789fc4ef77c2877))
+
+- **tests**: Add test for memoization in check_many() with shared requests
+  ([`5ad60fc`](https://github.com/guillem-ps/policy-pattern/commit/5ad60fc1fdc4a04aeb47ffb302e08ff37ab4c3f3))
+
+- **tests**: Add read counting store and view for tracking read operations
+  ([`adedc44`](https://github.com/guillem-ps/policy-pattern/commit/adedc448ed68c4acd4cbd9e27ebc0fb1c02aadd7))
+
+### Refactoring
+
+- **postgres**: Rename tests file for more context in filename
+  ([`ca5d52f`](https://github.com/guillem-ps/policy-pattern/commit/ca5d52f5184456faaf6a4064694265706598db89))
+
+- **tests**: Deduplicate and reorder test helpers
+  ([`104b4ed`](https://github.com/guillem-ps/policy-pattern/commit/104b4eddd0299177e4554dbcf28e40f7ba31c795))
+
+- **tests**: Remove unused _chain_of_groups function and replace its usage with _chain function
+  ([`6b1d830`](https://github.com/guillem-ps/policy-pattern/commit/6b1d8302d16ac267c588e9c204f05949337bf2d6))
+
+
+## v0.3.0 (2026-10-18)
+
+### Bug Fixes
+
+- **imports**: Update import paths for InvalidIdentifierError in models
+  ([`e92a417`](https://github.com/guillem-ps/policy-pattern/commit/e92a4179ae91c403cd1af7f8e11e1d3091098ecc))
+
+- **tests**: Suppress pyright warnings for private usage in permission checks
+  ([`b203f60`](https://github.com/guillem-ps/policy-pattern/commit/b203f6032621ccba25fabaa694f7b9de2b2c06c5))
+
+- **tests**: Update unit test marker description for clarity
+  ([`da01615`](https://github.com/guillem-ps/policy-pattern/commit/da0161570ae4ba7c6b3cf9e5d88bc7ba4e8e5559))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`e308a34`](https://github.com/guillem-ps/policy-pattern/commit/e308a34881c35dd909758abf824100e500bf706d))
+
+### Continuous Integration
+
+- **lint**: Optimize linting and testing commands
+  ([`6d44acb`](https://github.com/guillem-ps/policy-pattern/commit/6d44acb090190257ded8f5b2fdefb9b6a7c19156))
+
+- **tests**: Add PostgreSQL integration tests to CI pipeline
+  ([`c0586bc`](https://github.com/guillem-ps/policy-pattern/commit/c0586bc8c1b4de0a4633d0668d1564930deaa29c))
+
+### Documentation
+
+- Clarify architecture conventions for storage backend integration
+  ([`be19d7e`](https://github.com/guillem-ps/policy-pattern/commit/be19d7ed18cab23e6d5ff8d5e3ffea98ca524334))
+
+### Features
+
+- **dependencies**: Add psycopg and psycopg-pool for PostgreSQL support
+  ([`ef1edc7`](https://github.com/guillem-ps/policy-pattern/commit/ef1edc7505b15f073062140b848f6a375405df56))
+
+- **postgres**: Implement PostgreSQL TupleStore adapter and related functionality
+  ([`c255ad9`](https://github.com/guillem-ps/policy-pattern/commit/c255ad997b2de0b7886c7a845438ed62df1fbbc4))
+
+- **postgres**: Add auto_create_schema option for PostgresTupleStore and update documentation
+  ([`260d9fd`](https://github.com/guillem-ps/policy-pattern/commit/260d9fdbe7d8c82b080d7e7bc85a8bd0d8066690))
+
+- **postgres**: Implement IndexEntryTooLargeError for oversized index entries in PostgresTupleStore
+  ([`1feb43b`](https://github.com/guillem-ps/policy-pattern/commit/1feb43b59f4ac541418910dbc557f354a4b60a29))
+
+- **tests**: Add integration test for migrated PostgreSQL table schema
+  ([`e4a5594`](https://github.com/guillem-ps/policy-pattern/commit/e4a5594f1b677c6f3ad28861d3c472813d7906e8))
+
+- **tests**: Add PostgreSQL integration tests and fixtures for TupleStore
+  ([`fd885c7`](https://github.com/guillem-ps/policy-pattern/commit/fd885c772ef9f3ace6b2c3c76ea310e48301d129))
+
+- **tests**: Add pytest-randomly for shuffling test execution order
+  ([`16966b0`](https://github.com/guillem-ps/policy-pattern/commit/16966b086f0329adce2255c0477626fc67f03c60))
+
+### Refactoring
+
+- **adapters**: Remove unused imports from __init__.py
+  ([`61b8c77`](https://github.com/guillem-ps/policy-pattern/commit/61b8c7703c4227ba5ecd0ae0fa793de0018f81d9))
+
+- **tests**: Rename PostgreSQL integration test job for clarity
+  ([`1956bc2`](https://github.com/guillem-ps/policy-pattern/commit/1956bc21287944c6e26c230d186de0edbc976a83))
+
+### Testing
+
+- **marks**: Tag pytest markers per test instead of module-wide pytestmark
+  ([`5dbceed`](https://github.com/guillem-ps/policy-pattern/commit/5dbceede3a7b3d39d37b7748e8b1a64dd77d62f7))
+
+
+## v0.2.5 (2026-10-04)
+
+### Bug Fixes
+
+- **docs**: Update README example to include complete model setup and usage
+  ([`7d03852`](https://github.com/guillem-ps/policy-pattern/commit/7d038523b2d283fc3257c55a42c46d39d2a7b869))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`adbda5a`](https://github.com/guillem-ps/policy-pattern/commit/adbda5a3f04e0814288080d60eda8ff626fda8bc))
+
+
+## v0.2.4 (2026-10-04)
+
+### Bug Fixes
+
+- **format**: Solve type checking for TupleStore and View instantiation in tests
+  ([`fb9f428`](https://github.com/guillem-ps/policy-pattern/commit/fb9f4285271c3d408b2ff04bc0321ef610095466))
+
+### Build System
+
+- **deps**: Bump python-semantic-release/python-semantic-release
+  ([`ee4ed35`](https://github.com/guillem-ps/policy-pattern/commit/ee4ed35ea865b6efac942e127b346719022f84b2))
+
+- **deps**: Bump astral-sh/setup-uv
+  ([`a1deea9`](https://github.com/guillem-ps/policy-pattern/commit/a1deea92ae4efa146c53527635b4fad1907df26b))
+
+- **deps**: Bump the codeql-action group across 1 directory with 2 updates
+  ([`523584d`](https://github.com/guillem-ps/policy-pattern/commit/523584ddf017717b6ed6cd5aa31f96206e7d5fb7))
+
+- **deps-dev**: Update uv-build requirement
+  ([`7188013`](https://github.com/guillem-ps/policy-pattern/commit/7188013992d4b0640d46b471aff6ce98fb8955b8))
+
+- **deps-dev**: Bump ruff from 0.16.7 to 0.16.9
+  ([`9653c54`](https://github.com/guillem-ps/policy-pattern/commit/9653c54c68b99feb035f871796907a05a688dfcb))
+
+- **deps-dev**: Bump ty from 0.0.80 to 0.0.84
+  ([`7ad35b5`](https://github.com/guillem-ps/policy-pattern/commit/7ad35b5b233ffcd7987a8f851f190537f769dd9c))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`bb4393e`](https://github.com/guillem-ps/policy-pattern/commit/bb4393e9d91f571e6161cfd10d7a18768499372f))
+
 
 ## v0.2.3 (2026-10-03)
 
