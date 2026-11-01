@@ -1134,6 +1134,71 @@ def test_list_objects_budget_exhaustion_raises() -> None:
 
 
 @mark.unit
+def test_list_objects_reverse_walk_max_depth_exceeded() -> None:
+    """A nested group chain deeper than max_depth raises from the reverse walk."""
+    model = CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
+                permissions={},
+            ),
+            "document": Type(
+                name="document",
+                relations={"viewer": Relation(allowed_subject_types=("group#member",))},
+                permissions={},
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    group_a, group_b, group_c = _group("a"), _group("b"), _group("c")
+    document = _document("42")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="member", object=group_a),
+                    Tuple(subject=SubjectSet(object=group_a, relation="member"), relation="member", object=group_b),
+                    Tuple(subject=SubjectSet(object=group_b, relation="member"), relation="member", object=group_c),
+                    Tuple(subject=SubjectSet(object=group_c, relation="member"), relation="viewer", object=document),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    with raises(EvaluationError) as exc_info:
+        evaluator.list_objects(alice, "viewer", "document", budget=EvaluationBudget(max_depth=2))
+
+    assert exc_info.value.message.startswith("max_depth=2 exceeded during reverse lookup")
+
+
+@mark.unit
+def test_list_objects_reverse_walk_max_nodes_exceeded_between_dequeues() -> None:
+    """Queued subject identities can exceed max_nodes before the next store read."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice, document = _direct("alice"), _document("42")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    with raises(EvaluationError) as exc_info:
+        evaluator.list_objects(alice, "owner", "document", budget=EvaluationBudget(max_nodes=2))
+
+    assert exc_info.value.message == "max_nodes=2 exceeded during reverse lookup"
+
+
+@mark.unit
 def test_list_objects_candidate_ids_skips_the_reverse_walk() -> None:
     """A tiny budget that would raise via the reverse walk succeeds when given as candidate_ids instead."""
     model = CompiledModel(
