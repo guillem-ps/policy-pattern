@@ -247,7 +247,7 @@ class Evaluator:
                         visited.add(next_subject)
                         queue.append((next_subject, depth + 1))
 
-        return frozenset(object for object in candidates if object.type == object_type)
+        return frozenset(candidates)
 
     def _check_name(self, subject: Subject, name: str, object: ObjectReference, context: EvaluationContext) -> bool:
         """
