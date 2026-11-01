@@ -954,6 +954,235 @@ def test_check_tuple_to_userset_truncated_enumeration_raises() -> None:
 
 
 @mark.unit
+def test_list_objects_union() -> None:
+    """Union lists objects where either branch grants access."""
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    d1, d2, denied = _document("1"), _document("2"), _document("3")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="owner", object=d1),
+                    Tuple(subject=alice, relation="editor", object=d2),
+                    Tuple(subject=_direct("bob"), relation="owner", object=denied),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "viewer", "document") == frozenset({d1, d2})
+
+
+@mark.unit
+def test_list_objects_intersection() -> None:
+    """Intersection lists only objects granted by both branches."""
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    both, owner_only, editor_only = _document("1"), _document("2"), _document("3")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="owner", object=both),
+                    Tuple(subject=alice, relation="editor", object=both),
+                    Tuple(subject=alice, relation="owner", object=owner_only),
+                    Tuple(subject=alice, relation="editor", object=editor_only),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "manager", "document") == frozenset({both})
+
+
+@mark.unit
+def test_list_objects_exclusion() -> None:
+    """Exclusion omits objects matched by the subtracting relation."""
+    model = _document_model()
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    allowed, blocked = _document("1"), _document("2")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="owner", object=allowed),
+                    Tuple(subject=alice, relation="owner", object=blocked),
+                    Tuple(subject=alice, relation="blocked", object=blocked),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "restricted_viewer", "document") == frozenset({allowed})
+
+
+@mark.unit
+def test_list_objects_tuple_to_userset_parent_inheritance() -> None:
+    """TupleToUserset parent links add child objects whose parent grants access."""
+    model = CompiledModel(
+        types={
+            "folder": Type(
+                name="folder",
+                relations={
+                    "viewer": Relation(allowed_subject_types=("user",)),
+                    "parent": Relation(allowed_subject_types=("folder",)),
+                },
+                permissions={
+                    "inherited": Union(
+                        left=Reference(name="viewer"),
+                        right=TupleToUserset(tupleset="parent", computed="viewer"),
+                    )
+                },
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    root, child, denied = _folder("root"), _folder("child"), _folder("denied")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="viewer", object=root),
+                    Tuple(subject=DirectSubject(object=root), relation="parent", object=child),
+                    Tuple(subject=DirectSubject(object=_folder("other")), relation="parent", object=denied),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "inherited", "folder") == frozenset({root, child})
+
+
+@mark.unit
+def test_list_objects_empty_result() -> None:
+    """A subject reaching nothing of the queried type returns an empty frozenset, not an error."""
+    evaluator = Evaluator(model=_document_model(), store=MemoryTupleStore())
+
+    assert evaluator.list_objects(_direct("alice"), "viewer", "document") == frozenset()
+
+
+@mark.unit
+def test_list_objects_follows_nested_group_chain() -> None:
+    """A subject reachable only via group-of-groups, within the default budget, is still found."""
+    model = CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"member": Relation(allowed_subject_types=("user", "group#member"))},
+                permissions={},
+            ),
+            "document": Type(
+                name="document",
+                relations={"viewer": Relation(allowed_subject_types=("group#member",))},
+                permissions={},
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    alice, group_a, group_b, group_c = _direct("alice"), _group("a"), _group("b"), _group("c")
+    document = _document("42")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="member", object=group_a),
+                    Tuple(subject=SubjectSet(object=group_a, relation="member"), relation="member", object=group_b),
+                    Tuple(subject=SubjectSet(object=group_b, relation="member"), relation="member", object=group_c),
+                    Tuple(subject=SubjectSet(object=group_c, relation="member"), relation="viewer", object=document),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert document in evaluator.list_objects(alice, "viewer", "document")
+
+
+@mark.unit
+def test_list_objects_budget_exhaustion_raises() -> None:
+    """A reverse walk that would exceed the budget raises, never truncates silently."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice, document = _direct("alice"), _document("42")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    with raises(EvaluationError):
+        evaluator.list_objects(alice, "owner", "document", budget=EvaluationBudget(max_nodes=1))
+
+
+@mark.unit
+def test_list_objects_candidate_ids_skips_the_reverse_walk() -> None:
+    """A tiny budget that would raise via the reverse walk succeeds when given as candidate_ids instead."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice, document = _direct("alice"), _document("42")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    result = evaluator.list_objects(
+        alice,
+        "owner",
+        "document",
+        candidate_ids=frozenset({document}),
+        budget=EvaluationBudget(max_nodes=1),
+    )
+    assert result == frozenset({document})
+
+
+@mark.unit
+def test_list_objects_candidate_ids_still_filters_through_check() -> None:
+    """candidate_ids narrows the search, it does not grant anything check() wouldn't."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice, allowed, denied = _direct("alice"), _document("42"), _document("99")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=allowed)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "owner", "document", candidate_ids=frozenset({allowed, denied})) == frozenset(
+        {allowed}
+    )
+
+
+@mark.unit
 def test_memo_is_not_shared_across_subjects() -> None:
     """
     Test that one EvaluationContext reused for two different subjects gives each its own decision.

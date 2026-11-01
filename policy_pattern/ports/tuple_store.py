@@ -116,3 +116,14 @@ class View(ABC):
         `limit + 1` matching tuples before returning — that would violate the contract.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """
+        Enumerates every tuple whose subject exactly matches `subject`, bounded by `limit`.
+
+        Unlike `read_relation`, this is not filtered by relation name or
+        object; callers needing narrower results filter returned tuples.
+        See `ReadResult` for the `complete=False` contract.
+        """
+        raise NotImplementedError

@@ -187,9 +187,9 @@ def test_auto_create_schema_runs_packaged_migration_once() -> None:
     PostgresTupleStore(pool, auto_create_schema=True)
 
     expected_sql = files("policy_pattern").joinpath("sql", "postgres", "0001_create_policy_tuples.sql").read_text()
-    assert len(cursor.executed) == 1
-    assert cursor.executed[0] == expected_sql
-    assert connection.commit_calls == 1
+    expected_index_sql = files("policy_pattern").joinpath("sql", "postgres", "0002_add_subject_index.sql").read_text()
+    assert cursor.executed == [expected_sql, expected_index_sql]
+    assert connection.commit_calls == 2
 
 
 @mark.unit

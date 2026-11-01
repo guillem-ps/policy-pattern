@@ -2,6 +2,7 @@
 Evaluator: resolves check() over a CompiledModel and a TupleStore.
 """
 
+from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -147,6 +148,75 @@ class Evaluator:
         with self._store.snapshot() as view:
             context = EvaluationContext(view=view, budget=budget)
             return [self._check_name(subject, name, object, context) for subject, name, object in requests]
+
+    def list_objects(
+        self,
+        subject: Subject,
+        name: str,
+        object_type: str,
+        candidate_ids: frozenset[ObjectReference] | None = None,
+        budget: EvaluationBudget | None = None,
+    ) -> frozenset[ObjectReference]:
+        """Returns objects of `object_type` on which `subject` holds `name`."""
+        if budget is None:
+            budget = EvaluationBudget()
+        with self._store.snapshot() as view:
+            context = EvaluationContext(view=view, budget=budget)
+            candidates = (
+                self._reverse_candidates(subject, object_type, context) if candidate_ids is None else candidate_ids
+            )
+            return frozenset(
+                object
+                for object in sorted(candidates, key=repr)
+                if object.type == object_type and self._check_name(subject, name, object, context)
+            )
+
+    def _reverse_candidates(
+        self, subject: Subject, object_type: str, context: EvaluationContext
+    ) -> frozenset[ObjectReference]:
+        """Walk tuple subject edges to generate possible objects without interpreting permissions."""
+        queue: deque[tuple[Subject, int]] = deque([(subject, 0)])
+        visited: set[Subject] = {subject}
+        candidates: set[ObjectReference] = set()
+
+        while queue:
+            current, depth = queue.popleft()
+            if depth >= context.budget.max_depth:
+                raise EvaluationError(
+                    message=(f"max_depth={context.budget.max_depth!r} exceeded during reverse lookup from {current!r}"),
+                    related=f"subject={current!r}",
+                )
+            context.node_count += 1
+            if context.node_count > context.budget.max_nodes:
+                raise EvaluationError(
+                    message=f"max_nodes={context.budget.max_nodes!r} exceeded during reverse lookup",
+                    related=f"subject={current!r}",
+                )
+            self._charge_read(context, current.object, "list_objects")
+            result = context.view.read_tuples_for_subject(
+                current,
+                limit=context.budget.max_nodes - context.node_count,
+            )
+            if not result.complete:
+                raise EvaluationError(
+                    message=(f"enumeration for subject {current!r} truncated by remaining max_nodes budget"),
+                    related=f"subject={current!r}",
+                )
+
+            for tuple_ in sorted(result.tuples, key=repr):
+                candidates.add(tuple_.object)
+                # Tupleset relations use a direct object subject; userset
+                # relations use the object/relation subject identity.
+                next_subjects = (
+                    DirectSubject(object=tuple_.object),
+                    SubjectSet(object=tuple_.object, relation=tuple_.relation),
+                )
+                for next_subject in next_subjects:
+                    if next_subject not in visited:
+                        visited.add(next_subject)
+                        queue.append((next_subject, depth + 1))
+
+        return frozenset(object for object in candidates if object.type == object_type)
 
     def _check_name(self, subject: Subject, name: str, object: ObjectReference, context: EvaluationContext) -> bool:
         """

@@ -133,3 +133,17 @@ class _MemoryView(View):
             return ReadResult(tuples=frozenset(candidates[:limit]), complete=False)
 
         return ReadResult(tuples=frozenset(candidates), complete=True)
+
+    @override
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """Linearly scans the snapshot for tuples with this exact subject."""
+        candidates: list[Tuple] = nsmallest(
+            limit + 1,
+            (t for t in self.tuples if t.subject == subject),
+            key=repr,
+        )
+
+        if len(candidates) > limit:
+            return ReadResult(tuples=frozenset(candidates[:limit]), complete=False)
+
+        return ReadResult(tuples=frozenset(candidates), complete=True)

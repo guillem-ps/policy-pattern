@@ -8,13 +8,16 @@ from importlib.resources import files
 from typing import Any, override
 
 from policy_pattern.errors import IndexEntryTooLargeError
-from policy_pattern.models import Mutation, ObjectReference, Subject
+from policy_pattern.models import Mutation, ObjectReference, Subject, Tuple
 from policy_pattern.ports import ReadResult, TupleStore, View
 
 from ._db_protocols import Connection, ConnectionPool, Cursor
 from ._tuple_mapping import columns, compose, decompose
 
-MIGRATION_RESOURCE: tuple[str, str, str] = ("sql", "postgres", "0001_create_policy_tuples.sql")
+MIGRATION_RESOURCE: tuple[tuple[str, str, str], ...] = (
+    ("sql", "postgres", "0001_create_policy_tuples.sql"),
+    ("sql", "postgres", "0002_add_subject_index.sql"),
+)
 
 # PostgreSQL's B-tree index entry limit for the default 8KB page size
 # (BLCKSZ). Identifier bounds a value to 255 code points, any printable
@@ -68,6 +71,12 @@ _READ_RELATION_SQL: str = """
     ORDER BY subject_type, subject_id, subject_relation LIMIT %s
     """
 
+_READ_TUPLES_FOR_SUBJECT_SQL: str = """
+    SELECT object_type, object_id, relation FROM "authz_tuples"
+    WHERE subject_type=%s AND subject_id=%s AND subject_relation=%s
+    ORDER BY object_type, object_id, relation LIMIT %s
+    """
+
 
 class PostgresTupleStore(TupleStore):
     """
@@ -114,16 +123,17 @@ class PostgresTupleStore(TupleStore):
         failed execute() would otherwise return an aborted transaction to
         the pool for the next caller to trip over.
         """
-        migration_sql = files("policy_pattern").joinpath(*MIGRATION_RESOURCE).read_text(encoding="utf-8")
         with self._pool.connection() as conn:
             cursor = conn.cursor()
-            try:
-                cursor.execute(migration_sql)
-            except Exception:
-                conn.rollback()
-                raise
-            else:
-                conn.commit()
+            for resource in MIGRATION_RESOURCE:
+                migration_sql = files("policy_pattern").joinpath(*resource).read_text(encoding="utf-8")
+                try:
+                    cursor.execute(migration_sql)
+                except Exception:
+                    conn.rollback()
+                    raise
+                else:
+                    conn.commit()
 
     @override
     def write_tuples(self, mutation: Mutation) -> None:
@@ -254,4 +264,24 @@ class _PostgresView(View):
         rows: list[tuple[Any, ...]] = cursor.fetchall()
         tuples = frozenset(compose(r, relation, object) for r in rows[:limit])
 
+        return ReadResult(tuples=tuples, complete=len(rows) <= limit)
+
+    @override
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """Returns up to `limit` tuples whose subject exactly matches, in one query."""
+        subject_type, subject_id, subject_relation = decompose(subject)
+        cursor: Cursor = self.connection.cursor()
+        cursor.execute(
+            _READ_TUPLES_FOR_SUBJECT_SQL,
+            (subject_type, subject_id, subject_relation, limit + 1),
+        )
+        rows: list[tuple[Any, ...]] = cursor.fetchall()
+        tuples = frozenset(
+            Tuple(
+                subject=subject,
+                relation=row[2],
+                object=ObjectReference(type=row[0], id=row[1]),
+            )
+            for row in rows[:limit]
+        )
         return ReadResult(tuples=tuples, complete=len(rows) <= limit)
