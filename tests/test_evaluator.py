@@ -1180,9 +1180,16 @@ def test_list_objects_reverse_walk_max_nodes_exceeded_between_dequeues() -> None
     """Queued subject identities can exceed max_nodes before the next store read."""
     model = CompiledModel(
         types={
+            "group": Type(
+                name="group",
+                relations={
+                    "reference_document": Relation(allowed_subject_types=("document", "document#owner")),
+                },
+                permissions={},
+            ),
             "document": Type(
                 name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
-            )
+            ),
         }
     )
     store = MemoryTupleStore()
@@ -1245,6 +1252,138 @@ def test_list_objects_candidate_ids_still_filters_through_check() -> None:
     assert evaluator.list_objects(alice, "owner", "document", candidate_ids=frozenset({allowed, denied})) == frozenset(
         {allowed}
     )
+
+
+@mark.unit
+def test_list_objects_reverse_walk_follows_permission_userset_name() -> None:
+    """Reverse lookup follows a userset permission name distinct from its backing relation."""
+    model = CompiledModel(
+        types={
+            "group": Type(
+                name="group",
+                relations={"owner": Relation(allowed_subject_types=("user",))},
+                permissions={"member": Reference(name="owner")},
+            ),
+            "document": Type(
+                name="document",
+                relations={"viewer": Relation(allowed_subject_types=("group#member",))},
+                permissions={},
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    alice, group, document = _direct("alice"), _group("eng"), _document("42")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="owner", object=group),
+                    Tuple(subject=SubjectSet(object=group, relation="member"), relation="viewer", object=document),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.check(alice, "viewer", document) is True
+    assert document in evaluator.list_objects(alice, "viewer", "document")
+
+
+@mark.unit
+def test_list_objects_validates_type_and_name() -> None:
+    """Reverse lookup rejects undeclared object types and names just like check()."""
+    evaluator = Evaluator(model=_document_model(), store=MemoryTupleStore())
+    missing_errors: list[str] = []
+    for name, object_type, error_type in (
+        ("viewer", "not_a_real_type", UnknownTypeError),
+        ("not_a_real_name", "document", UnknownNameError),
+    ):
+        try:
+            with raises(error_type):
+                evaluator.list_objects(_direct("alice"), name, object_type)
+        except BaseException as error:
+            missing_errors.append(str(error))
+
+    assert missing_errors == []
+
+
+@mark.unit
+def test_list_objects_reverse_walk_depth_budget_allows_found_grant() -> None:
+    """A dead-end frontier at the depth limit does not invalidate a grant already found."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice, document = _direct("alice"), _document("42")
+    store.write_tuples(
+        Mutation(additions=frozenset({Tuple(subject=alice, relation="owner", object=document)}), deletions=frozenset())
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "owner", "document", budget=EvaluationBudget(max_depth=1)) == frozenset(
+        {document}
+    )
+
+
+@mark.unit
+def test_list_objects_reverse_walk_store_read_budget_avoids_dead_ends() -> None:
+    """Direct grants fit the store-read budget without probing irrelevant frontier identities."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            )
+        }
+    )
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    documents = frozenset(_document(str(index)) for index in range(1, 7))
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(Tuple(subject=alice, relation="owner", object=document) for document in documents),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "owner", "document", budget=EvaluationBudget(max_store_reads=10)) == documents
+
+
+@mark.unit
+def test_list_objects_reverse_walk_ignores_undeclared_tuple_object_type() -> None:
+    """Malformed tuple object types stay inert and duplicate direct identities are visited once."""
+    model = CompiledModel(
+        types={
+            "document": Type(
+                name="document", relations={"owner": Relation(allowed_subject_types=("user",))}, permissions={}
+            ),
+            "index": Type(
+                name="index", relations={"references": Relation(allowed_subject_types=("ghost",))}, permissions={}
+            ),
+        }
+    )
+    store = MemoryTupleStore()
+    alice = _direct("alice")
+    ghost = ObjectReference(type="ghost", id="missing-from-model")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=alice, relation="owner", object=ghost),
+                    Tuple(subject=alice, relation="other", object=ghost),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
+    evaluator = Evaluator(model=model, store=store)
+
+    assert evaluator.list_objects(alice, "owner", "document") == frozenset()
 
 
 @mark.unit
