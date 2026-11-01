@@ -234,18 +234,18 @@ needs:
 - **enumerate by `(object, relation)`**: which subjects/usersets hold this
   relation on this object? Needed for direct relations and as the base case
   for union, intersection, exclusion, and tuple-to-userset traversal.
+- **enumerate by subject**: which tuples have this exact subject? The
+  `read_tuples_for_subject(subject, limit)` query is unfiltered by relation
+  or object type, so reverse lookup can follow every tuple edge from a
+  reached subject identity.
 
-There is deliberately **no subject-keyed query** ("find all tuples for this
-subject") in v1. Forward evaluation never needs it — it always starts from
-the queried object and walks relations outward, never the reverse. A
-subject-keyed query is what reverse lookup / `ListObjects` ("which documents
-can John view?") needs, and that is explicitly out of scope for v1. Don't
-add it just because it looks symmetric with `(object, relation)` lookup;
-add it only when `ListObjects` is actually being designed.
-
-Whatever concrete Python method names implement these two shapes is an
-interface detail, not part of this contract — only the two capabilities
-above are normative for v1.
+The subject-keyed read follows the same bounded-enumeration contract as
+`read_relation`: adapters return at most `limit` tuples and set
+`ReadResult.complete=False` if more matches exist. Callers must treat an
+incomplete result as truncation, not as a complete enumeration. It is used
+by `Evaluator.list_objects()` to generate reverse-lookup candidates; forward
+`check()` itself continues to start from the queried object and walk
+relations outward.
 
 ### Enumeration must be boundable
 

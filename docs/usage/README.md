@@ -134,10 +134,10 @@ The whole batch runs inside one `store.snapshot()` and shares one evaluation cac
 requests depend on — a parent folder's `viewer`, say — is computed once rather than once per request. The
 returned list is aligned to `requests` by position, duplicates included.
 
-This filters a candidate set; it does not discover one. `policy-pattern` has no reverse lookup
-("which documents can alice view?") — the caller supplies the candidates, usually straight from its own
-business data. The budget is shared across the batch too, so a batch large enough to exhaust it raises
-`EvaluationError` rather than returning a short list.
+This filters a candidate set; it does not discover one — the caller supplies the candidates, usually
+straight from its own business data. The budget is shared across the batch too, so a batch large enough
+to exhaust it raises `EvaluationError` rather than returning a short list. For the reverse question
+("which documents can alice view?"), see [`list_objects()`](#list_objects--reverse-lookup) below.
 
 ## Rewrite Operators
 
@@ -215,6 +215,36 @@ evaluator.check(carol, "inherited_viewer", document_99)  # True — via folder:e
 `TupleToUserset(tupleset="parent", computed="viewer")` reads: "find the object(s) related to this one via `parent`,
 then check `viewer` on *that* object instead." This is how a document under `folder:engineering` inherits access
 from the folder without copying a permission onto every document individually.
+
+## `list_objects()` — reverse lookup
+
+`check()` and `check_many()` answer "does this subject hold this permission on this object" — the
+caller already names the object(s). `list_objects()` answers the reverse question: "which objects of
+this type does this subject hold this permission on", with no candidate set supplied. It walks the
+store backward from `subject` (following direct grants, group membership, and the same `parent`-style
+links `TupleToUserset` follows forward) to find candidates, then filters every candidate through the
+same `check()` path — so it can never return an object `check()` would deny. Using the facts built up
+over this guide — bob is a member of `group:eng`, which is `editor` on `document:42`; carol has
+`viewer` on `folder:engineering`, which is `document:99`'s `parent`:
+
+```python
+evaluator.list_objects(bob, "inherited_viewer", "document")  # {document_42}   — via group:eng#member
+evaluator.list_objects(alice, "inherited_viewer", "document")  # {document_42}   — direct owner
+evaluator.list_objects(carol, "inherited_viewer", "document")  # {document_99}   — via folder:engineering
+```
+
+If the caller already has its own candidate set — the common case when objects come from a paginated
+business query — pass it as `candidate_ids` to skip the reverse walk entirely and go straight to the
+`check()` filter:
+
+```python
+candidates = frozenset({document_42, document_99, ObjectReference(type="document", id="7")})
+evaluator.list_objects(bob, "inherited_viewer", "document", candidate_ids=candidates)  # {document_42}
+```
+
+`document_99` and `document:7` are excluded the same way `check_many()` excludes a denied request — `candidate_ids` only narrows the search, it never grants anything `check()` wouldn't. 
+
+The reverse walk shares `EvaluationBudget` with the forward filter (one budget for the whole call, same rule as `check_many()`), so a subject reachable through an unusually large fan-out raises `EvaluationError` rather than silently returning a partial result.
 
 ## `EvaluationBudget`
 
