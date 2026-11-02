@@ -119,6 +119,26 @@ evaluator = Evaluator(model=compiled, store=store)
 evaluator.check(alice, "viewer", document_42)  # True — alice is a direct owner
 ```
 
+`check_many()` answers the same question for many requests at once, when the caller already has a list of
+candidates to filter:
+
+```python
+candidates = [document_42, ObjectReference(type="document", id="7"), ObjectReference(type="document", id="99")]
+decisions = evaluator.check_many([(alice, "viewer", document) for document in candidates])
+# [True, False, False] — only document:42 has a tuple granting alice access
+
+allowed = [document for document, decision in zip(candidates, decisions, strict=True) if decision]
+```
+
+The whole batch runs inside one `store.snapshot()` and shares one evaluation cache, so a sub-check several
+requests depend on — a parent folder's `viewer`, say — is computed once rather than once per request. The
+returned list is aligned to `requests` by position, duplicates included.
+
+This filters a candidate set; it does not discover one — the caller supplies the candidates, usually
+straight from its own business data. The budget is shared across the batch too, so a batch large enough
+to exhaust it raises `EvaluationError` rather than returning a short list. For the reverse question
+("which documents can alice view?"), see [`list_objects()`](#list_objects--reverse-lookup) below.
+
 ## Rewrite Operators
 
 Permissions compose with real Python operators:
@@ -196,6 +216,36 @@ evaluator.check(carol, "inherited_viewer", document_99)  # True — via folder:e
 then check `viewer` on *that* object instead." This is how a document under `folder:engineering` inherits access
 from the folder without copying a permission onto every document individually.
 
+## `list_objects()` — reverse lookup
+
+`check()` and `check_many()` answer "does this subject hold this permission on this object" — the
+caller already names the object(s). `list_objects()` answers the reverse question: "which objects of
+this type does this subject hold this permission on", with no candidate set supplied. It walks the
+store backward from `subject` (following direct grants, group membership, and the same `parent`-style
+links `TupleToUserset` follows forward) to find candidates, then filters every candidate through the
+same `check()` path — so it can never return an object `check()` would deny. Using the facts built up
+over this guide — bob is a member of `group:eng`, which is `editor` on `document:42`; carol has
+`viewer` on `folder:engineering`, which is `document:99`'s `parent`:
+
+```python
+evaluator.list_objects(bob, "inherited_viewer", "document")  # {document_42}   — via group:eng#member
+evaluator.list_objects(alice, "inherited_viewer", "document")  # {document_42}   — direct owner
+evaluator.list_objects(carol, "inherited_viewer", "document")  # {document_99}   — via folder:engineering
+```
+
+If the caller already has its own candidate set — the common case when objects come from a paginated
+business query — pass it as `candidate_ids` to skip the reverse walk entirely and go straight to the
+`check()` filter:
+
+```python
+candidates = frozenset({document_42, document_99, ObjectReference(type="document", id="7")})
+evaluator.list_objects(bob, "inherited_viewer", "document", candidate_ids=candidates)  # {document_42}
+```
+
+`document_99` and `document:7` are excluded by the same `check()` filter `candidate_ids` always goes through — `candidate_ids` only narrows the search, it never grants anything `check()` wouldn't (unlike `check_many()`, which returns a decision per request and leaves the filtering to the caller, `list_objects()` does that filtering itself). 
+
+The reverse walk shares `EvaluationBudget` with the forward filter (one budget for the whole call, same rule as `check_many()`), so a subject reachable through an unusually large fan-out raises `EvaluationError` rather than silently returning a partial result.
+
 ## `EvaluationBudget`
 
 Every `check()` call is bounded — `EvaluationBudget` caps how much work one call can do, defaulting to
@@ -207,9 +257,7 @@ from policy_pattern.evaluator import EvaluationBudget
 evaluator.check(alice, "viewer", document_42, budget=EvaluationBudget(max_depth=5, max_nodes=100, max_store_reads=50))
 ```
 
-A `check()` that would need more than the budget allows raises `EvaluationError` — it never silently returns
-`False` because it ran out of budget. A cycle in the stored data (however it got there) raises the same error, for
-the same reason: an ambiguous or unbounded evaluation is not a safe "no."
+A `check()` that would need more than the budget allows raises `EvaluationError` — it never silently returns `False` because it ran out of budget. A cycle in the stored data (however it got there) raises the same error, for the same reason: an ambiguous or unbounded evaluation is not a safe "no."
 
 ## Error Handling
 
@@ -233,32 +281,28 @@ See [Errors](../errors.md) for the full code registry and design rationale.
 
 ## Using `PostgresTupleStore`
 
-`PostgresTupleStore` stores tuples in a PostgreSQL table. By default, it
-does not create or migrate that schema: the host service applies the
-change through its migration tool (Alembic, a raw-SQL migration step,
-etc.).
+`PostgresTupleStore` stores tuples in a PostgreSQL table. By default, it does not create or migrate that schema: the host service applies the change through its migration tool (Alembic, a raw-SQL migration step, etc.).
 
-As an opt-in convenience, pass `auto_create_schema=True` to create the
-table from the packaged migration when constructing the adapter. This
-requires the connection role to have `CREATE` privilege. It runs
-`CREATE TABLE IF NOT EXISTS`; it does not track migration history or
-verify an existing table's schema, so use your service's migration
-workflow when you need managed schema changes.
+As an opt-in convenience, pass `auto_create_schema=True` to create the table from the packaged migration when constructing the adapter. This requires the connection role to have `CREATE` privilege. It runs `CREATE TABLE IF NOT EXISTS`; it does not track migration history or verify an existing table's schema, so use your service's migration workflow when you need managed schema changes.
 
-The matching DDL ships as a package resource, not as code the library
-runs:
+The matching DDL ships as two package resources, applied in order, not as
+code the library runs:
 
 ```python
 from importlib.resources import files
 
-migration_sql = files("policy_pattern").joinpath("sql", "postgres", "0001_create_policy_tuples.sql").read_text()
+for resource in (
+    "0001_create_policy_tuples.sql",  # the table itself
+    "0002_add_subject_index.sql",  # the index list_objects() needs
+):
+    migration_sql = files("policy_pattern").joinpath("sql", "postgres", resource).read_text()
+    ...  # hand each to your migration tool, same order
 ```
 
-Hand that string to your migration tool the same way you'd hand it any
-other raw-SQL migration step — e.g. `op.execute(migration_sql)` in an
-Alembic revision. For the default setup, apply it once before the service
-that uses `PostgresTupleStore` starts. With `auto_create_schema=True`,
-the adapter runs this packaged SQL at construction instead.
+Hand each string to your migration tool the same way you'd hand it any other raw-SQL migration step — e.g. `op.execute(migration_sql)` per revision in Alembic. For the default setup, apply both once before the service that uses `PostgresTupleStore` starts. With
+`auto_create_schema=True`, the adapter runs both packaged statements at construction instead, each in its own transaction.
+
+**On an existing deployment with a populated table**, `0002`'s `CREATE INDEX` (without `CONCURRENTLY`) holds a lock that blocks writes to `authz_tuples` for as long as the index build takes. `auto_create_schema` cannot use `CREATE INDEX CONCURRENTLY` itself — this adapter requires `autocommit=False` on every connection (documented below), and `CONCURRENTLY` cannot run inside any transaction, not even an implicit one-statement one. If the table already has real data, apply this index manually with `CREATE INDEX CONCURRENTLY authz_tuples_subject_idx ON "authz_tuples" (subject_type, subject_id, subject_relation);` outside `auto_create_schema`, ahead of upgrading, instead of letting the packaged migration take the lock.
 
 Once the schema exists, construct the adapter with a real connection pool:
 
@@ -282,24 +326,10 @@ with store.snapshot() as view:
 Three things worth knowing before relying on this in a real service:
 
 - **With the default setting, runtime credentials need only
-  `SELECT`/`INSERT`/`DELETE` on the tuple table.** If you enable
-  `auto_create_schema`, the connection role also needs `CREATE` privilege.
+  `SELECT`/`INSERT`/`DELETE` on the tuple table.** If you enable `auto_create_schema`, the connection role also needs `CREATE` privilege.
 - **A missing table is not handled specially.** If the migration was
-  never applied, the first query raises the driver's own "relation does
-  not exist" error when using the default setting. With
-  `auto_create_schema=True`, the adapter attempts to create the table
-  during construction.
+  never applied, the first query raises the driver's own "relation does not exist" error when using the default setting. With `auto_create_schema=True`, the adapter attempts to create the table during construction.
 - **Writing a tuple is not in the same transaction as your own business
-  writes.** `write_tuples()` commits its own transaction when it
-  returns. If a request needs "update this business row and record this
-  permission tuple atomically," that's a cross-transaction coordination
-  problem your service has to solve itself — `policy-pattern` does not
-  provide a way to enlist both in one transaction.
+  writes.** `write_tuples()` commits its own transaction when it returns. If a request needs "update this business row and record this permission tuple atomically," that's a  cross-transaction coordination problem your service has to solve itself — `policy-pattern` does not provide a way to enlist both in one transaction.
 - **An `Identifier` valid by its own rules can still be too large for
-  this adapter.** `Identifier` bounds a value by code points (255 max,
-  any printable Unicode), not encoded bytes. `write_tuples()` checks the
-  encoded size of an addition's primary key before acquiring a
-  connection and raises `IndexEntryTooLargeError` (`PP900`) if it would
-  exceed PostgreSQL's B-tree index entry limit, instead of letting the
-  driver's own cryptic "index row size exceeds btree ... maximum" error
-  surface.
+  this adapter.** `Identifier` bounds a value by code points (255 max, any printable Unicode), not encoded bytes. `write_tuples()` checks the encoded size of an addition's primary key before acquiring a connection and raises `IndexEntryTooLargeError` (`PP900`) if it would exceed PostgreSQL's B-tree index entry limit, instead of letting the driver's own cryptic "index row size exceeds btree ... maximum" error surface.

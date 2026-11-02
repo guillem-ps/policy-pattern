@@ -1,49 +1,32 @@
 # Semantics
 
-This document defines the observable behavior `policy-pattern` guarantees,
-independent of any particular storage adapter. It is the source of truth for
-what "correct" means in this library — more important than any single
-adapter's Python interface. Every adapter (`MemoryTupleStore`,
-`PostgresTupleStore`, and any future one) must satisfy the contract below,
-verified by a shared contract test suite that runs against all of them.
+This document defines the observable behavior `policy-pattern` guarantees, independent of any particular storage adapter. It is the source of truth for what "correct" means in this library — more important than any single adapter's Python interface. Every adapter (`MemoryTupleStore`,
+`PostgresTupleStore`, and any future one) must satisfy the contract below, verified by a shared contract test suite that runs against all of them.
 
-This document covers **storage semantics** only — mutations, reads, and
-consistency. Evaluation semantics (union, intersection, exclusion,
-tuple-to-userset, recursion, cycle handling) and public API semantics
-(`check()`'s exact error contract) live in `docs/architecture.md` instead —
+This document covers **storage semantics** only — mutations, reads, and consistency. Evaluation semantics (union, intersection, exclusion,
+tuple-to-userset, recursion, cycle handling) and public API semantics (`check()`'s exact error contract) live in `docs/architecture.md` instead —
 deliberately not duplicated here.
 
-A note on scope: this document states *what must be true*. It deliberately
-avoids naming how a specific adapter achieves it (e.g. which PostgreSQL
-isolation level or index it uses) — that belongs in that adapter's own
-design notes, not in the cross-adapter contract.
+A note on scope: this document states *what must be true*. It deliberately avoids naming how a specific adapter achieves it (e.g. which PostgreSQL isolation level or index it uses) — that belongs in that adapter's own design notes, not in the cross-adapter contract.
 
 ## Authorization store / namespace
 
-An authorization store (namespace) is the isolation boundary within which
-tuples, mutations, and snapshots are scoped. `policy-pattern` assigns it no
-further meaning. Applications may use a store per tenant, per environment,
-or any other scheme that fits their needs — that is an application-level
-decision, not something this library encodes.
+An authorization store (namespace) is the isolation boundary within which tuples, mutations, and snapshots are scoped. `policy-pattern` assigns it no further meaning. Applications may use a store per tenant, per environment, or any other scheme that fits their needs — that is an application-level decision, not something this library encodes.
 
-**Cross-store mutations are not representable, by construction.** A
-`TupleStore` instance (or handle) is bound to exactly one authorization
-store. Mutation and read calls do not take a store identifier as a
-parameter — there is no field to put a second store's id into. This is
-stronger than "reject cross-store input at runtime": the shape of the API
-makes the invalid case impossible to express in the first place.
+**Cross-store mutations are not representable, by construction.** A `TupleStore` instance (or handle) is bound to exactly one authorization
+store. Mutation and read calls do not take a store identifier as a parameter — there is no field to put a second store's id into. This is
+stronger than "reject cross-store input at runtime": the shape of the API makes the invalid case impossible to express in the first place.
 
 ## Valid tuple domain
 
 ### Schema-agnostic storage
 
-`TupleStore` stores and compares structurally well-formed
-`(subject, relation, object)` triples. It does **not** validate that a
-`relation` or type is declared in an `AuthorizationModel`, or that an
-`object`'s type accepts that relation. That validation belongs to a layer
-above storage (the model/validation layer), not to `TupleStore` — a
-`PostgresTupleStore` that starts rejecting unknown relations while
-`MemoryTupleStore` accepts them silently breaks substitutability between
+-`TupleStore` stores and compares structurally well-formed
+-`(subject, relation, object)` triples. It does **not** validate that a
+-`relation` or type is declared in an `AuthorizationModel`, or that an
+-`object`'s type accepts that relation. That validation belongs to a layer above storage (the model/validation layer), not to `TupleStore` — a
+- `PostgresTupleStore` that starts rejecting unknown relations while
+- `MemoryTupleStore` accepts them silently breaks substitutability between
 adapters, which the contract tests exist to catch.
 
 ### Identifier bounds
@@ -90,9 +73,13 @@ Identifier semantics (this section):
 Canonical textual serialization (separate, not yet specified):
     a grammar + escaping scheme that can round-trip any valid identifier
     through the "type:id" / "type:id#relation" text form without
-    ambiguity. Needed before any adapter serializes tuples to text (SQL
-    storage keys, logs, wire format) — not yet designed, tracked as a
-    follow-up before the first adapter ships, not silently absent.
+    ambiguity. `PostgresTupleStore` sidesteps the need entirely — it stores
+    each component in its own structured column
+    (`object_type`/`object_id`/`relation`/`subject_type`/`subject_id`/
+    `subject_relation`), never a single serialized text key. Still needed
+    the moment a consumer actually wants one text key (logs, a wire format,
+    a different adapter's storage shape) — not yet designed, not silently
+    absent, tracked as a follow-up once that need is real.
 ```
 
 Equality and comparison always operate on the **structured** form (see
@@ -247,18 +234,18 @@ needs:
 - **enumerate by `(object, relation)`**: which subjects/usersets hold this
   relation on this object? Needed for direct relations and as the base case
   for union, intersection, exclusion, and tuple-to-userset traversal.
+- **enumerate by subject**: which tuples have this exact subject? The
+  `read_tuples_for_subject(subject, limit)` query is unfiltered by relation
+  or object type, so reverse lookup can follow every tuple edge from a
+  reached subject identity.
 
-There is deliberately **no subject-keyed query** ("find all tuples for this
-subject") in v1. Forward evaluation never needs it — it always starts from
-the queried object and walks relations outward, never the reverse. A
-subject-keyed query is what reverse lookup / `ListObjects` ("which documents
-can John view?") needs, and that is explicitly out of scope for v1. Don't
-add it just because it looks symmetric with `(object, relation)` lookup;
-add it only when `ListObjects` is actually being designed.
-
-Whatever concrete Python method names implement these two shapes is an
-interface detail, not part of this contract — only the two capabilities
-above are normative for v1.
+The subject-keyed read follows the same bounded-enumeration contract as
+`read_relation`: adapters return at most `limit` tuples and set
+`ReadResult.complete=False` if more matches exist. Callers must treat an
+incomplete result as truncation, not as a complete enumeration. It is used
+by `Evaluator.list_objects()` to generate reverse-lookup candidates; forward
+`check()` itself continues to start from the queried object and walk
+relations outward.
 
 ### Enumeration must be boundable
 

@@ -1,32 +1,22 @@
 # Architecture
 
-This document defines the shape of the authorization model and evaluator —
-everything `docs/semantics.md` deliberately leaves out (that document covers
-storage semantics only: mutations, reads, snapshot consistency, and remains
-the source of truth for that). This document covers the model, the compile
-step, and the evaluator, and how they fit together with the storage port.
+This document defines the shape of the authorization model and evaluator — everything `docs/semantics.md` deliberately leaves out (that document covers storage semantics only: mutations, reads, snapshot consistency, and remains the source of truth for that). This document covers the model, the compile step, and the evaluator, and how they fit together with the storage port.
 
 ## Positioning
 
-`policy-pattern` is not aiming to be the smallest Zanzibar clone. It is a
-small, embeddable ReBAC engine for Python designed to make authorization
-models understandable, testable, and auditable — that is the filter every
-design decision below passes through. Feature breadth that chases
-OpenFGA/SpiceDB parity (ABAC, consistency tokens, a text DSL, an HTTP
-server) is deliberately out of scope; see "Scope" below.
+`policy-pattern` is not aiming to be the smallest Zanzibar clone. It is a small, embeddable ReBAC engine for Python designed to make authorization models understandable, testable, and auditable — that is the filter every design decision below passes through.  
+  
+Feature breadth that chases OpenFGA/SpiceDB parity (ABAC, consistency tokens, a text DSL, an HTTP server) is deliberately out of scope; see "Scope" below.
 
 ## ReBAC theory → Python classes
 
-ReBAC (Relationship-Based Access Control) models authorization as a graph
-of relationship **facts**, not roles. Zanzibar's canonical notation for one
-fact is:
+ReBAC (Relationship-Based Access Control) models authorization as a graph of relationship **facts**, not roles. Zanzibar's canonical notation for one fact is:
 
 ```text
 <object>#<relation>@<subject>
 ```
 
-e.g. `document:42#owner@user:john`. This one line already contains every
-concept the model layer needs to represent:
+e.g. `document:42#owner@user:john`. This one line already contains every concept the model layer needs to represent:
 
 ```text
 <object>    → ObjectReference(type="document", id="42")
@@ -34,155 +24,94 @@ concept the model layer needs to represent:
 <subject>   → DirectSubject(ObjectReference(type="user", id="john"))
 ```
 
-A **subject can itself be a userset**, not just a person — Zanzibar's other
-key idea, needed for groups and nested groups:
+A **subject can itself be a userset**, not just a person — Zanzibar's other key idea, needed for groups and nested groups:
 
 ```text
 group:eng#member@group:backend#member
 ```
 
-reads as "every member of `group:backend` is also a member of
-`group:eng`" — the subject here is `SubjectSet(object=ObjectReference(type="group",
-id="backend"), relation="member")`, not a direct entity.
+reads as "every member of `group:backend` is also a member of `group:eng`" — the subject here is `SubjectSet(object=ObjectReference(type="group", id="backend"), relation="member")`, not a direct entity.
 
-None of `<object>`/`<subject>` carry any meaning about *why* access is
-granted by themselves — a tuple is just a stored fact ("this relationship
-exists"). What turns a bag of tuples into an authorization **policy** is
-the separate question of how relations combine, covered below.
+None of `<object>`/`<subject>` carry any meaning about *why* access is granted by themselves — a tuple is just a stored fact ("this relationship exists"). What turns a bag of tuples into an authorization **policy** is the separate question of how relations combine, covered below.
 
 ### The graph node: `Identifier` → `ObjectReference`
 
-Every node in the graph (an object being checked, or a subject that is a
-concrete entity rather than a userset) is identified the same way: a
-`type` and an `id`. `ObjectReference(type: str, id: str)` is that node
-type. Both fields are themselves **validated identifiers** — bounded
-length, printable, no padding whitespace — which is why `Identifier`
-exists underneath it as a reusable validator (see below) rather than each
+Every node in the graph (an object being checked, or a subject that is a concrete entity rather than a userset) is identified the same way: a
+`type` and an `id`. `ObjectReference(type: str, id: str)` is that node type. Both fields are themselves **validated identifiers** — bounded
+length, printable, no padding whitespace — which is why `Identifier ` exists underneath it as a reusable validator (see below) rather than each
 class inventing its own bounds check.
 
-`ObjectReference` says nothing about relations or permissions — it only
-answers "which concrete entity is this," the same role a primary key
-plays in a database. It gets reused, not duplicated, everywhere the model
-needs to name a concrete entity: as the object of a tuple, and nested
+`ObjectReference` says nothing about relations or permissions — it only answers "which concrete entity is this," the same role a primary key
+plays in a database. It gets reused, not duplicated, everywhere the model needs to name a concrete entity: as the object of a tuple, and nested
 inside `DirectSubject`/`SubjectSet` for the subject side.
 
 ### `Relation` vs `Permission`: stored fact vs computed rule
 
-A tuple only says a relationship **exists** — `document:42#parent@folder:eng`
-does not by itself imply anyone can view `document:42`. The rule that
-turns stored facts into a yes/no answer is the **authorization model**,
-split into two distinct kinds of thing (not one namespace shared by both,
-unlike OpenFGA):
+A tuple only says a relationship **exists** — `document:42#parent@folder:eng`does not by itself imply anyone can view `document:42`. The rule that turns stored facts into a yes/no answer is the **authorization model**, split into two distinct kinds of thing (not one namespace shared by both, unlike OpenFGA):
 
-- **`Relation`** — a storable edge. What `write_tuples()` can actually
-  persist. No rewrite logic of its own.
-- **`Permission`** — a computed expression over relations/other
-  permissions. Never storable; built from `PermissionExpression` (`Reference`,
-  `TupleToUserset`, `Union`, `Intersection`, `Exclusion`).
+- **`Relation`** — a storable edge. What `write_tuples()` can actually persist. No rewrite logic of its own.
+- **`Permission`** — a computed expression over relations/other permissions. Never storable; built from `PermissionExpression` (`Reference`, `TupleToUserset`, `Union`, `Intersection`, `Exclusion`).
 
-Concretely, the rewrite rules are **set algebra** over "who holds this
-relation on this object":
+Concretely, the rewrite rules are **set algebra** over "who holds this relation on this object":
 
 ```text
 viewer(o) = owner(o) ∪ editor(o)                          Union
-can_edit(o) = editor(o) ∩ active_member(o)                Intersection
-viewer(o) = member(o) \ blocked(o)                        Exclusion
+can_edit(o) = editor(o) ∩ active_member(o)         Intersection
+viewer(o) = member(o) \ blocked(o)                      Exclusion
 ```
 
-`TupleToUserset` is the one rewrite that isn't a set operation on the
-*same* object — it jumps to a *different* object first
-(`document:42#parent@folder:eng`) and then evaluates a relation/permission
-*there* (`folder:eng#viewer`). This is exactly how a folder hierarchy
-grants access to everything under it without copying permissions onto
-every child.
+`TupleToUserset` is the one rewrite that isn't a set operation on the *same* object — it jumps to a *different* object first
+(`document:42#parent@folder:eng`) and then evaluates a relation/permission *there* (`folder:eng#viewer`). This is exactly how a folder hierarchy
+grants access to everything under it without copying permissions onto every child.
 
 ### Everything below is one of these two theoretical pieces
 
-Every remaining class in the model is either a **node** (identity, no
-meaning by itself — `Identifier`, `ObjectReference`, `Subject`), a **fact**
-(`Tuple`, `Mutation`), or **policy** (`Relation`, `Permission`, `Type`,
-`Model`). The subsections below give each one's exact Python shape.
-**Built** marks what actually exists in `policy_pattern/` today, tested;
-everything else is design, not yet implemented.
+Every remaining class in the model is either a **node** (identity, no meaning by itself — `Identifier`, `ObjectReference`, `Subject`), a **fact**
+(`Tuple`, `Mutation`), or **policy** (`Relation`, `Permission`, `Type`, `Model`). The subsections below give each one's exact Python shape.
 
-### `Identifier` (`models/identifier.py`) — Built
+### `Identifier` (`models/identifier.py`)
 
-`Identifier(value: str, field: str)` — not part of the original design,
-introduced during implementation once it became clear almost every
-name-shaped string in the model (`ObjectReference.type`/`.id`,
-`Relation.allowed_subject_types` entries, and later `Type.name`,
-`Reference.name`, `TupleToUserset.tupleset`/`.computed`) needs the exact
-same validation: non-empty, bounded length
-(`MIN_IDENTIFIER_LENGTH`/`MAX_IDENTIFIER_LENGTH`, currently 1/255),
-printable characters only, no leading/trailing whitespace. `field` names
-which attribute is being validated, for error context — it is never
-externally-sourced, so it only requires non-empty, not the full bounds
-check `value` gets.
+`Identifier(value: str, field: str)` — not part of the original design, introduced during implementation once it became clear almost every
+name-shaped string in the model (`ObjectReference.type`/`.id`, `Relation.allowed_subject_types` entries, and later `Type.name`,
+`Reference.name`, `TupleToUserset.tupleset`/`.computed`) needs the exact same validation: non-empty, bounded length
+(`MIN_IDENTIFIER_LENGTH`/`MAX_IDENTIFIER_LENGTH`, currently 1/255), printable characters only, no leading/trailing whitespace. `field` names which attribute is being validated, for error context — it is never externally-sourced, so it only requires non-empty, not the full bounds check `value` gets.
 
-It is a **validator used by delegation, not a wrapper kept around**: other
-Value Objects construct a throwaway `Identifier` per string they need
-validated, let `__post_init__` raise on invalid input, and store the
-original `str` — never `identifier.value`. This keeps every other class
-ergonomic (`reference.type` is a plain `str`, never needs unwrapping)
-while centralizing the validation rule in one place.
+It is a **validator used by delegation, not a wrapper kept around**: other Value Objects construct a throwaway `Identifier` per string they need
+validated, let `__post_init__` raise on invalid input, and store the original `str` — never `identifier.value`. This keeps every other class
+ergonomic (`reference.type` is a plain `str`, never needs unwrapping) while centralizing the validation rule in one place.
 
-### `ObjectReference` (`models/object_reference.py`) — Built
+### `ObjectReference` (`models/object_reference.py`)
 
-`ObjectReference(type: str, id: str)` — a concrete object, e.g.
-`document:42`. Delegates both fields to `Identifier` in `__post_init__`.
+`ObjectReference(type: str, id: str)` — a concrete object, e.g. `document:42`. Delegates both fields to `Identifier` in `__post_init__`.
 
-### `Subject`, `Tuple`, `Mutation` (`models/subject.py`, `models/direct_subject.py`, `models/subject_set.py`, `models/tuple.py`, `models/mutation.py`) — Built
+### `Subject`, `Tuple`, `Mutation` (`models/subject.py`, `models/direct_subject.py`, `models/subject_set.py`, `models/tuple.py`, `models/mutation.py`)
 
-- `Subject` (`models/subject.py`) — `type Subject = DirectSubject |
-  SubjectSet` (PEP 695 type alias, not a wrapper class — a wrapper would
+- `Subject` (`models/subject.py`) — `type Subject = DirectSubject |  SubjectSet` (PEP 695 type alias, not a wrapper class — a wrapper would
   allow the illegal state of both/neither variant set).
-- `DirectSubject(object: ObjectReference)` (`models/direct_subject.py`) —
-  a concrete subject, e.g. `user:john`; composes `ObjectReference`, does
-  not inherit from it.
-- `SubjectSet(object: ObjectReference, relation: str)`
-  (`models/subject_set.py`) — a userset reference, e.g. `group:eng#member`.
-- `Tuple(subject: Subject, relation: str, object: ObjectReference)` — one
-  stored fact. `relation` must name a `Relation`, never a `Permission`.
-- `Mutation(additions: frozenset[Tuple], deletions: frozenset[Tuple])` — one
-  atomic write; `additions`/`deletions` disjoint, empty mutation is a valid
-  no-op (`semantics.md`).
+- `DirectSubject(object: ObjectReference)` (`models/direct_subject.py`) — a concrete subject, e.g. `user:john`; composes `ObjectReference`, does not inherit from it.
+- `SubjectSet(object: ObjectReference, relation: str)`(`models/subject_set.py`) — a userset reference, e.g. `group:eng#member`.
+- `Tuple(subject: Subject, relation: str, object: ObjectReference)` — one stored fact. `relation` must name a `Relation`, never a `Permission`.
+- `Mutation(additions: frozenset[Tuple], deletions: frozenset[Tuple])` — one atomic write; `additions`/`deletions` disjoint, empty mutation is a valid no-op (`semantics.md`).
 
-All three, like `Identifier`/`ObjectReference`: `@dataclass(frozen=True,
-slots=True)`, structural equality and immutability from stdlib, no
-external value-object library, no shared `Name` wrapper class — delegate
-identifier-shaped fields to `Identifier` the same way `ObjectReference`
-does.
+All three, like `Identifier`/`ObjectReference`: `@dataclass(frozen=True, slots=True)`, structural equality and immutability from stdlib, no
+external value-object library, no shared `Name` wrapper class — delegate identifier-shaped fields to `Identifier` the same way `ObjectReference` does.
 
-### `Relation` (`models/relation.py`) — Built
+### `Relation` (`models/relation.py`)
 
-`Relation(allowed_subject_types: tuple[str, ...])` — a storable edge, no
-rewrite algebra. Each entry is a type name (`"user"`) or a userset
-restriction (`"organization#member"`) — the same textual shape as
-`SubjectSet`, not a separate type; each is delegated to `Identifier`.
-`tuple`, not `list`: a `list` field on a `frozen=True` dataclass is still
-mutable in place and makes the instance unhashable — the exact gotcha this
-project already flagged once for `Mutation`'s `frozenset[Tuple]`. This is
-the only thing `TupleStore.write_tuples()` can ever target. Requires at
-least one entry — an empty `allowed_subject_types` is a relation nothing
-could ever satisfy.
+`Relation(allowed_subject_types: tuple[str, ...])` — a storable edge, no rewrite algebra. Each entry is a type name (`"user"`) or a userset
+restriction (`"organization#member"`) — the same textual shape as `SubjectSet`, not a separate type; each is delegated to `Identifier`.
+`tuple`, not `list`: a `list` field on a `frozen=True` dataclass is still mutable in place and makes the instance unhashable — the exact gotcha this project already flagged once for `Mutation`'s `frozenset[Tuple]`. This is the only thing `TupleStore.write_tuples()` can ever target. Requires at
+least one entry — an empty `allowed_subject_types` is a relation nothing could ever satisfy.
 
-### `PermissionExpression` (`models/operators.py`, `models/reference.py`, `models/tuple_to_userset.py`) — Built
+### `PermissionExpression` (`models/operators.py`, `models/reference.py`, `models/tuple_to_userset.py`)
 
-A computed expression, never storable. Base class overloads
-`__or__`/`__and__`/`__sub__`; five node types, split across three files by
-actual coupling rather than one-file-per-class: `operators.py` holds the
-base plus `Union`/`Intersection`/`Exclusion` (they reference the base
-class in their own methods, so keeping them together avoids a circular
-import); `Reference` and `TupleToUserset` are independent leaves, each in
-its own file:
+A computed expression, never storable. Base class overloads`__or__`/`__and__`/`__sub__`; five node types, split across three files by
+actual coupling rather than one-file-per-class: `operators.py` holds the base plus `Union`/`Intersection`/`Exclusion` (they reference the base
+class in their own methods, so keeping them together avoids a circular import); `Reference` and `TupleToUserset` are independent leaves, each in its own file:
 
-- `Reference(name: str)` — names a relation or permission on the same type;
-  the evaluator resolves which one it is at evaluation time.
-- `TupleToUserset(tupleset: str, computed: str)` — `tupleset` must resolve
-  to a `Relation` (traversal needs stored data, never another computation);
-  `computed` is evaluated on the object found via `tupleset`.
-- `Union(left, right)`, `Intersection(left, right)`, `Exclusion(include,
-  exclude)` (`include - exclude`, binary).
+- `Reference(name: str)` — names a relation or permission on the same type; the evaluator resolves which one it is at evaluation time.
+- `TupleToUserset(tupleset: str, computed: str)` — `tupleset` must resolve to a `Relation` (traversal needs stored data, never another computation); `computed` is evaluated on the object found via `tupleset`.
+- `Union(left, right)`, `Intersection(left, right)`, `Exclusion(include,  exclude)` (`include - exclude`, binary).
 
 Composition uses real Python operators:
 
@@ -194,31 +123,25 @@ viewer = (
 )
 ```
 
-This keeps `TupleStore` from ever needing to know about rewrite rules — a
-clean port boundary.
+This keeps `TupleStore` from ever needing to know about rewrite rules — a clean port boundary.
 
-### `Type`, `Model`, `CompiledModel` — Built
+### `Type`, `Model`, `CompiledModel`
 
 (`models/type.py`, `models/model.py`, `models/compiled_model.py`)
 
 - `Type(name: str, relations: Mapping[str, Relation], permissions:
   Mapping[str, PermissionExpression])` — one object type's declarations.
-  `frozen=True`, but `relations`/`permissions` are wrapped in
-  `MappingProxyType` over a copy of the input dict in `__post_init__` — a
-  plain `dict` field on a frozen dataclass is still mutable in place and
-  unhashable, the same gotcha already noted for `Relation`'s `tuple` vs
-  `list` choice above. `name` forbids `#` — one restriction beyond the
-  general `Identifier` bound (`docs/semantics.md`): `#` is reserved for
-  userset notation (`"type#relation"`) inside `Relation.allowed_subject_types`,
-  and a real `Type.name` that could also contain `#` would make that
-  notation ambiguous to tell apart from a plain type-name entry.
-- `Model(types: dict[str, Type])` — the whole schema, deliberately **not**
-  frozen (mutable, authoring-time, built up incrementally), plus
+  `frozen=True`, but `relations`/`permissions` are wrapped in `MappingProxyType` over a copy of the
+  input dict in `__post_init__` — a plain `dict` field on a frozen dataclass is still mutable in place
+  and unhashable, the same gotcha already noted for `Relation`'s `tuple` vs `list` choice above. `name`
+  forbids `#` — one restriction beyond the general `Identifier` bound (`docs/semantics.md`): `#` is
+  reserved for userset notation (`"type#relation"`) inside `Relation.allowed_subject_types`, and a real
+  `Type.name` that could also contain `#` would make that notation ambiguous to tell apart from a plain
+  type-name entry.
+- `Model(types: dict[str, Type])` — the whole schema, deliberately **not** frozen (mutable, authoring-time, built up incrementally), plus
   `.compile() -> CompiledModel`.
-- `CompiledModel(types: Mapping[str, Type])` — immutable result of a
-  successful `compile()`; the only thing `Evaluator` accepts. Same
-  `MappingProxyType`-over-a-copy treatment as `Type`, and the one place it
-  matters most: it is `Evaluator`'s trust boundary.
+- `CompiledModel(types: Mapping[str, Type])` — immutable result of a successful `compile()`; the only thing `Evaluator` accepts. Same
+  `MappingProxyType`-over-a-copy treatment as `Type`, and the one place it matters most: it is `Evaluator`'s trust boundary.
 
 ### `TupleStore` / `View` (`ports/tuple_store.py`)
 
@@ -239,6 +162,11 @@ class Evaluator:
         object: ObjectReference,
         budget: EvaluationBudget | None = None,  # defaults to EvaluationBudget()
     ) -> bool: ...
+    def check_many(
+        self,
+        requests: Sequence[tuple[Subject, str, ObjectReference]],
+        budget: EvaluationBudget | None = None,
+    ) -> list[bool]: ...
 ```
 
 - `EvaluationBudget(max_depth=25, max_nodes=10_000, max_store_reads=1_000)`
@@ -246,14 +174,11 @@ class Evaluator:
 - `EvaluationContext` — internal only: `visited`, depth, node/read counters,
   memo.
 
-### Errors (`errors/`) — Built
+### Errors (`errors/`)
 
-- `BaseError` — base, `code` `ClassVar`, `message`/`related`
-  properties, no `Exception.args` reliance. Shaped after the LSP
-  Diagnostic model; see `docs/errors.md` for the full rationale and the
-  `PPxxx` code ranges.
-- `InvalidIdentifierError` (`PP001`), `InvalidRelationError` (`PP002`),
-  `InvalidMutationError` (`PP003`) — construction-time validation errors,
+- `BaseError` — base, `code` `ClassVar`, `message`/`related` properties, no `Exception.args` reliance. Shaped after the LSP
+  Diagnostic model; see `docs/errors.md` for the full rationale and the `PPxxx` code ranges.
+- `InvalidIdentifierError` (`PP001`), `InvalidRelationError` (`PP002`),  `InvalidMutationError` (`PP003`) — construction-time validation errors,
   raised from a Value Object's own `__post_init__`.
 - `UnknownTypeError` (`PP202`), `UnknownNameError` (`PP203`) — raised from
   `Evaluator._check_name` against an already-compiled model, not from a
@@ -296,7 +221,7 @@ directly, without inheriting from anything.
 ```
 policy_pattern/
 ├── py.typed
-├── errors/                      # Built — package, not a single file (see below)
+├── errors/                      # package, not a single file (see below)
 │   ├── base_error.py             # BaseError
 │   ├── identifier_error.py       # InvalidIdentifierError (PP001)
 │   ├── relation_error.py         # InvalidRelationError (PP002)
@@ -307,34 +232,38 @@ policy_pattern/
 │   ├── evaluation_error.py       # EvaluationError (PP201)
 │   └── index_entry_too_large_error.py # IndexEntryTooLargeError (PP900)
 ├── models/
-│   ├── identifier.py             # Identifier — Built
-│   ├── object_reference.py       # ObjectReference — Built
-│   ├── relation.py               # Relation — Built
-│   ├── direct_subject.py         # DirectSubject — Built
-│   ├── subject_set.py            # SubjectSet — Built
-│   ├── subject.py                # Subject (type alias) — Built
-│   ├── tuple.py                  # Tuple — Built
-│   ├── mutation.py               # Mutation — Built
-│   ├── operators.py              # PermissionExpression base, Union, Intersection, Exclusion — Built
-│   ├── reference.py              # Reference — Built
-│   ├── tuple_to_userset.py       # TupleToUserset — Built
-│   ├── type.py                   # Type — Built
-│   ├── model.py                  # Model — Built
-│   └── compiled_model.py         # CompiledModel — Built
+│   ├── identifier.py             # Identifier
+│   ├── object_reference.py       # ObjectReference
+│   ├── relation.py               # Relation
+│   ├── direct_subject.py         # DirectSubject
+│   ├── subject_set.py            # SubjectSet
+│   ├── subject.py                # Subject (type alias)
+│   ├── tuple.py                  # Tuple
+│   ├── mutation.py               # Mutation
+│   ├── operators.py              # PermissionExpression base, Union, Intersection, Exclusion
+│   ├── reference.py              # Reference
+│   ├── tuple_to_userset.py       # TupleToUserset
+│   ├── type.py                   # Type
+│   ├── model.py                  # Model
+│   └── compiled_model.py         # CompiledModel
 ├── ports/
-│   └── tuple_store.py            # TupleStore, View — Built
+│   └── tuple_store.py            # TupleStore, View
 ├── adapters/
-│   └── memory.py                 # MemoryTupleStore — Built
-└── evaluator.py                  # Evaluator, EvaluationBudget — Built
+│   ├── memory.py                 # MemoryTupleStore
+│   └── postgres.py               # PostgresTupleStore
+└── evaluator.py                  # Evaluator, EvaluationBudget
 ```
 
 `errors/` became a package instead of a single file — each concrete error
 plus its own `PPxxx` code gets its own small file, same reasoning as
 splitting `models/` by class rather than keeping everything in one
 `tuples.py`: one file per concept, split as soon as there's more than one
-concept, not before. `postgres.py` under `adapters/` does not exist until
-Postgres work actually starts; its dependency will be an optional extra
-(`policy-pattern[postgres]`), never a hard dependency.
+concept, not before. `PostgresTupleStore` takes its connection pool from the
+caller instead of importing `psycopg` to build one — `psycopg`/`psycopg-pool`
+are only in the `test` dependency group (for integration tests against a real
+Postgres), never a runtime dependency of the published package
+(`dependencies = []` in `pyproject.toml`). No `policy-pattern[postgres]`
+extra was needed.
 
 ## Compile step
 
@@ -352,13 +281,13 @@ for why that's still safe.
 
 ## Cycles are caught at runtime, uniformly
 
-A single guard — `visited`, keyed by `(object, name)`, inside
+A single guard — `visited`, keyed by `(subject, object, name)`, inside
 `EvaluationContext` — catches every cycle, whether it originates from real
 data (`folder:A#parent@folder:B` / `folder:B#parent@folder:A` via
 `TupleToUserset`, crossing object *instances*) or from a same-object
-self-reference with no traversal involved at all. Re-entering an
-`(object, name)` pair already being evaluated within one `check()` call
-raises `EvaluationError`. There is no separate compile-time schema-cycle
+self-reference with no traversal involved at all. Re-entering a
+`(subject, object, name)` triple already being evaluated within one
+`check()`/`check_many()` request raises `EvaluationError`. There is no separate compile-time schema-cycle
 guard: it would only change *when* the error surfaces, never add safety
 `visited` doesn't already provide, since neither path can produce a false
 allow.
@@ -370,6 +299,26 @@ entirely against it — it never touches `TupleStore` directly, so two
 snapshots can never mix inside one `check()` (per `semantics.md`'s
 snapshot-consistency requirement).
 
+`check_many()` opens that same single `View` once for a whole batch and
+shares one `EvaluationContext` across every request in it — so the memo is
+shared, and `max_nodes` and `max_store_reads` accumulate over the batch
+rather than resetting per request. `max_depth` instead bounds
+the live cycle-detection frontier, `len(context.visited)`, which unwinds
+when each sub-check returns; it does not accumulate across requests. Sharing
+the context is the feature, not an optimization detail: it is why a sub-check
+several requests depend on is paid for once.
+
+Because the two accumulating limits span the batch, the caller has to account
+for batch size in `max_nodes` and `max_store_reads`, or split work across
+calls; `max_depth` remains a per-traversal bound. With the defaults
+(`max_depth=25`, `max_nodes=10_000`, `max_store_reads=1_000`),
+`max_store_reads` is the first likely limit to bind, though the model
+determines the actual cost. There is no partial-result mode, so exhausting
+any limit discards every decision for that batch, including ones already
+computed. For `PostgresTupleStore`, the same lifetime also holds a pool
+connection and a read-only transaction open; the transaction's old snapshot
+keeps `xmin` behind and can delay vacuum until the batch finishes.
+
 `EvaluationBudget` tracks more than depth alone: a wide-shallow graph (depth
 5, branching 100) can cost more than a deep-narrow one (depth 30, branching
 1) — `max_nodes` bounds pure traversal cost, `max_store_reads` bounds actual
@@ -380,16 +329,22 @@ their budget very differently.
 Evaluation order is deterministic: `Union`/`Intersection` branches are
 evaluated left-to-right, in declaration order — never `set`/hash iteration
 order. Same model + same tuples + same request + same budget ⇒ same
-decision, always.
+decision, always; and for `check_many()`, the same `requests` sequence ⇒ the
+same `list[bool]`, evaluated in input order.
 
 ## Error contract
 
 ```
-check() -> bool                         the only normal return value
+check() -> bool                          the only normal return value
+check_many() -> list[bool]               one decision per request, aligned by position
 raise EvaluationError                    budget exceeded, cycle detected
 raise ModelValidationError               compile()-time only, never at runtime
 raise <adapter-specific error>           storage errors always propagate, never swallowed into False
 ```
+
+A `check_many()` batch has no partial-result mode: any error aborts the whole
+call and propagates. Returning a shorter list would make a missing decision
+indistinguishable from a denial.
 
 No shared `policy_pattern.errors.StorageError` base in v1 — see "ReBAC
 theory → Python classes" § Errors above.
@@ -404,7 +359,7 @@ theory → Python classes" § Errors above.
 protocols. No consumer needs that substitutability yet; splitting now would
 be an abstraction with one implementation.
 
-`MemoryTupleStore` (v1) and `PostgresTupleStore` (v2) are both adapters
+`MemoryTupleStore` and `PostgresTupleStore` are both adapters
 of the same `TupleStore` port. `MemoryTupleStore`: lock, copy the tuple
 set, release lock, evaluate against the immutable copy (per
 `semantics.md`'s Threading section). Building `PostgresTupleStore` did
@@ -430,6 +385,8 @@ v1:    Model (Relation/Permission) + compile() + reference validation
        deterministic evaluation order, uniform runtime cycle guard
 v1.x:  compile()-time schema-cycle detection (better error message, not a
        safety requirement), explain() with an explicit trust boundary,
+       Evaluator.check_many() (batch checks — formerly unscheduled,
+       confirmed in scope, built, see below), Evaluator.list_objects(),
        an invariants API over an explicit fixture set, unused/complexity
        static warnings, Mermaid/DOT visualization
 v2:    semantic model diff over an explicit fixture set, text DSL,
@@ -445,24 +402,27 @@ information-disclosure risk (e.g. revealing that `team:backend` exists and
 who's in it to a caller who was denied) — it needs an explicit trust
 boundary (never wired to the same path as public `check()`) before it's
 built. Diff/invariants features must operate only over an explicit,
-caller-provided fixture set of checks, never store-wide enumeration, since
-`semantics.md` already declares no subject-keyed query / no `ListObjects` as
-a v1 non-goal for the storage port.
+caller-provided fixture set of checks, never store-wide enumeration.
+`Evaluator.list_objects()` is the separate, bounded reverse-lookup API.
+
+`Evaluator.list_objects(subject, name, object_type, candidate_ids=None,
+budget=None)` is shipped in v1.x. It can discover candidates through the
+subject-keyed tuple read or filter caller-supplied candidates, then checks
+every returned object through the normal forward evaluator.
 
 ## Beyond v2 (unscheduled)
 
 Ideas with no target version yet — not committed to any release, listed so
 a future proposal for one of these isn't mistaken for a new idea:
 
-- **Reverse lookup** — `ListObjects(subject, relation, object_type)` for
-  "which documents can user:7 view?" questions. Different storage access
-  pattern from forward `check()`; excluded from the v1 storage port (see
-  above).
 - **Contextual tuples** — request-scoped relationships that participate in
   one `check()` without being persisted (facts derived from a request,
   token, or application state).
-- **Batch checks** — evaluate multiple authorization questions while safely
-  reusing evaluation state across them.
+- ~~Batch checks~~ — **promoted to v1.x, 2026-10-18** (see "Scope" above):
+  evaluate multiple authorization questions while safely reusing
+  evaluation state across them. Confirmed as the engine behind the v1.x
+  invariants API and as the cheap, forward-only option when the caller can
+  supply its own candidate set.
 - **Model versioning** — explicit versioning and migration of authorization
   models as applications evolve.
 - **Advanced consistency** — consistency tokens or another mechanism for

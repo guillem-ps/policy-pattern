@@ -113,6 +113,14 @@ class _PoolDouble(ConnectionPool):
         yield self.connection_double
 
 
+class _NeverCalledPool(ConnectionPool):
+    """Pool double whose connection() always fails — proves a code path never reaches it."""
+
+    @override
+    def connection(self) -> AbstractContextManager[Connection]:
+        raise AssertionError("pool.connection() must not be called when auto_create_schema is False")
+
+
 @mark.unit
 def test_write_tuples_rolls_back_and_reraises_executemany_error() -> None:
     """Test that a batch write failure rolls back once and preserves its exception."""
@@ -179,17 +187,9 @@ def test_auto_create_schema_runs_packaged_migration_once() -> None:
     PostgresTupleStore(pool, auto_create_schema=True)
 
     expected_sql = files("policy_pattern").joinpath("sql", "postgres", "0001_create_policy_tuples.sql").read_text()
-    assert len(cursor.executed) == 1
-    assert cursor.executed[0] == expected_sql
-    assert connection.commit_calls == 1
-
-
-class _NeverCalledPool(ConnectionPool):
-    """Pool double whose connection() always fails — proves a code path never reaches it."""
-
-    @override
-    def connection(self) -> AbstractContextManager[Connection]:
-        raise AssertionError("pool.connection() must not be called when auto_create_schema is False")
+    expected_index_sql = files("policy_pattern").joinpath("sql", "postgres", "0002_add_subject_index.sql").read_text()
+    assert cursor.executed == [expected_sql, expected_index_sql]
+    assert connection.commit_calls == 2
 
 
 @mark.unit
