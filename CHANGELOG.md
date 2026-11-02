@@ -2,6 +2,45 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-11-02)
+
+### Bug Fixes
+
+- Update list_objects() to return all candidates regardless of object type
+  ([`21cb0dd`](https://github.com/guillem-ps/policy-pattern/commit/21cb0ddf86e78966e629096913eda0be76478331))
+
+- **changelog**: Restore automatic changelog generation and backfill missing entries
+  ([`cb5408b`](https://github.com/guillem-ps/policy-pattern/commit/cb5408b265a5e26ae0dd48b987f6a89a84a4e1ce))
+
+- **docs**: Clarify candidate_ids filtering in list_objects() documentation
+  ([`60c8cc2`](https://github.com/guillem-ps/policy-pattern/commit/60c8cc2e74241e836ac40ec3c51e57663234dfa3))
+
+- **docs**: Improve clarity and formatting in README.md
+  ([`85179a5`](https://github.com/guillem-ps/policy-pattern/commit/85179a5acfb2dcc359f7af2d1a676fd2927a338a))
+
+- **list_objects**: Close reverse-walk gaps
+  ([`f441b87`](https://github.com/guillem-ps/policy-pattern/commit/f441b871d04bb6b0e7ea12fb06e528a58648d968))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`defcff9`](https://github.com/guillem-ps/policy-pattern/commit/defcff98d3f0042829652f1c51326aa5f7e03d59))
+
+### Features
+
+- Add list_objects() reverse lookup
+  ([`9e5eb52`](https://github.com/guillem-ps/policy-pattern/commit/9e5eb52d3659a8fd597b85c3ed7589739420be3a))
+
+- Add unit tests for reverse walk max depth and node limits in list_objects()
+  ([`4d654f1`](https://github.com/guillem-ps/policy-pattern/commit/4d654f10c0cbfb5c8bd4b5d6450bb6a1af3df8cc))
+
+- Enhance documentation for read_tuples_for_subject and related methods
+  ([`b6929c0`](https://github.com/guillem-ps/policy-pattern/commit/b6929c0325d4c25a853550591876e23e9940845e))
+
+- Update documentation for list_objects() reverse lookup and related semantics
+  ([`1acadc9`](https://github.com/guillem-ps/policy-pattern/commit/1acadc9ad1d3dd44629162956b4ccd5ee822dabb))
+
+
 ## v0.4.1 (2026-10-31)
 
 ### Build System
