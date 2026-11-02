@@ -1,6 +1,6 @@
 # Testing
 
-How this project is tested, and what every test is expected to prove. For lint/type checks, see [`AGENTS.md`](AGENTS.md) § Development Workflow.
+How this project is tested, and what every test is expected to prove. For lint/type checks, see [`AGENTS.md`](../AGENTS.md) § Development Workflow.
 
 ## Commands, by intent
 
@@ -20,13 +20,13 @@ How this project is tested, and what every test is expected to prove. For lint/t
 
 | Kind | Against | Notes |
 |---|---|---|
-| Unit | Behavior in isolation from storage | Every Value Object also carries [`CODE_STYLE.md`](.github/CODE_STYLE.md) § Value Objects' minimum |
+| Unit | Behavior in isolation from storage | Every Value Object also carries [`CODE_STYLE.md`](CODE_STYLE.md) § Value Objects' minimum |
 | Integration / end-to-end | The adapter's real backing service, via testcontainers | Never a mock of the storage port |
 | Contract (`tests/contract/`) | Every adapter | A green run on one adapter alone proves nothing about another |
 
 Never mock the authorization engine itself in a test exercising `check()`/`check_many()`/the evaluator — that's exactly the component a security bug would hide behind. 
   
-See  [`docs/semantics.md`](docs/semantics.md) for why.
+See  [`docs/semantics.md`](../docs/semantics.md) for why.
 
 ## TDD is mandatory
 

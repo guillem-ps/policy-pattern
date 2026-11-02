@@ -133,3 +133,28 @@ class _MemoryView(View):
             return ReadResult(tuples=frozenset(candidates[:limit]), complete=False)
 
         return ReadResult(tuples=frozenset(candidates), complete=True)
+
+    @override
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """Linearly scans the snapshot for tuples with this exact subject.
+
+        Args:
+            subject (Subject): The exact subject to match.
+            limit (int): The maximum number of matching tuples to return.
+
+        Returns:
+            ReadResult: Matching tuples and whether the enumeration is complete.
+
+        Raises:
+            None: This method defines no exception of its own.
+        """
+        candidates: list[Tuple] = nsmallest(
+            limit + 1,
+            (t for t in self.tuples if t.subject == subject),
+            key=repr,
+        )
+
+        if len(candidates) > limit:
+            return ReadResult(tuples=frozenset(candidates[:limit]), complete=False)
+
+        return ReadResult(tuples=frozenset(candidates), complete=True)
