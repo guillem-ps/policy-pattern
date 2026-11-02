@@ -2,8 +2,10 @@
 Evaluator: resolves check() over a CompiledModel and a TupleStore.
 """
 
+from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from .errors import EvaluationError, UnknownNameError, UnknownTypeError
 from .models import (
@@ -147,6 +149,156 @@ class Evaluator:
         with self._store.snapshot() as view:
             context = EvaluationContext(view=view, budget=budget)
             return [self._check_name(subject, name, object, context) for subject, name, object in requests]
+
+    def list_objects(
+        self,
+        subject: Subject,
+        name: str,
+        object_type: str,
+        candidate_ids: frozenset[ObjectReference] | None = None,
+        budget: EvaluationBudget | None = None,
+    ) -> frozenset[ObjectReference]:
+        """Returns objects of `object_type` on which `subject` holds `name`.
+
+        Args:
+            subject (Subject): The subject whose access is queried.
+            name (str): The relation or permission name to check.
+            object_type (str): The type of objects to return.
+            candidate_ids (frozenset[ObjectReference] | None): Optional objects to check instead of discovering them.
+            budget (EvaluationBudget | None): Resource limits for this evaluation.
+
+        Returns:
+            frozenset[ObjectReference]: Objects of `object_type` allowed by the forward check.
+
+        Raises:
+            UnknownTypeError: If `object_type` is not declared in the CompiledModel.
+            UnknownNameError: If `name` is not declared on `object_type`.
+            EvaluationError: If reverse candidate discovery or a candidate check exhausts the evaluation budget.
+        """
+        if object_type not in self._model.types:
+            raise UnknownTypeError(
+                message=f"type {object_type!r} is not declared in this CompiledModel",
+                related=f"object_type={object_type!r}",
+            )
+        declaration = self._model.types[object_type]
+        if name not in declaration.relations and name not in declaration.permissions:
+            raise UnknownNameError(
+                message=f"{name!r} is not declared as a relation or permission on {object_type!r}",
+                related=f"object_type={object_type!r}",
+            )
+
+        if budget is None:
+            budget = EvaluationBudget()
+
+        with self._store.snapshot() as view:
+            context = EvaluationContext(view=view, budget=budget)
+            candidates = self._reverse_candidates(subject, context) if candidate_ids is None else candidate_ids
+
+            return frozenset(
+                object
+                for object in sorted(candidates, key=repr)
+                if object.type == object_type and self._check_name(subject, name, object, context)
+            )
+
+    def _reverse_candidates(self, subject: Subject, context: EvaluationContext) -> frozenset[ObjectReference]:
+        """Walk tuple subject edges to generate possible objects without interpreting permissions.
+
+        Args:
+            subject (Subject): The starting subject for the reverse walk.
+            context (EvaluationContext): The shared view and resource-budget state.
+
+        Returns:
+            frozenset[ObjectReference]: All candidate objects reached by the tuple walk.
+
+        Raises:
+            EvaluationError: If `max_depth` or `max_nodes` is exceeded, or a subject-keyed enumeration is truncated.
+        """
+        queue: deque[tuple[Subject, int]] = deque([(subject, 0)])
+        visited: set[Subject] = {subject}
+        candidates: set[ObjectReference] = set()
+
+        while queue:
+            current, depth = queue.popleft()
+            context.node_count += 1
+            if context.node_count > context.budget.max_nodes:
+                raise EvaluationError(
+                    message=f"max_nodes={context.budget.max_nodes!r} exceeded during reverse lookup",
+                    related=f"subject={current!r}",
+                )
+
+            self._charge_read(context, current.object, "list_objects")
+            result = context.view.read_tuples_for_subject(
+                current,
+                limit=context.budget.max_nodes - context.node_count,
+            )
+
+            if not result.complete:
+                raise EvaluationError(
+                    message=(f"enumeration for subject {current!r} truncated by remaining max_nodes budget"),
+                    related=f"subject={current!r}",
+                )
+
+            if result.tuples and depth >= context.budget.max_depth:
+                raise EvaluationError(
+                    message=(f"max_depth={context.budget.max_depth!r} exceeded during reverse lookup from {current!r}"),
+                    related=f"subject={current!r}",
+                )
+
+            for tuple_ in sorted(result.tuples, key=repr):
+                candidates.add(tuple_.object)
+                for next_subject in self._reverse_frontier(tuple_.object):
+                    if next_subject not in visited:
+                        visited.add(next_subject)
+                        queue.append((next_subject, depth + 1))
+
+        return frozenset(candidates)
+
+    @cached_property
+    def _referenceable_shapes(self) -> frozenset[str]:
+        """Return the subject shapes referenced by any relation in the model.
+
+        Returns:
+            frozenset[str]: Subject type and type/relation shapes allowed by model relations.
+
+        Raises:
+            None.
+        """
+        return frozenset(
+            allowed_shape
+            for type_declaration in self._model.types.values()
+            for relation in type_declaration.relations.values()
+            for allowed_shape in relation.allowed_subject_types
+        )
+
+    def _reverse_frontier(self, object: ObjectReference) -> tuple[Subject, ...]:
+        """Return the declared subject identities that may reference `object`.
+
+        Args:
+            object (ObjectReference): The object whose possible subject identities are generated.
+
+        Returns:
+            tuple[Subject, ...]: Direct and userset identities that model relations may reference.
+
+        Raises:
+            None.
+        """
+        next_subjects: list[Subject] = []
+        if object.type in self._referenceable_shapes:
+            next_subjects.append(DirectSubject(object=object))
+
+        declaration = self._model.types.get(object.type)
+        if declaration is None:
+            return tuple(next_subjects)
+
+        names = (*declaration.relations, *declaration.permissions)
+        next_subjects.extend(
+            [
+                SubjectSet(object=object, relation=name)
+                for name in names
+                if f"{object.type}#{name}" in self._referenceable_shapes
+            ]
+        )
+        return tuple(next_subjects)
 
     def _check_name(self, subject: Subject, name: str, object: ObjectReference, context: EvaluationContext) -> bool:
         """

@@ -41,10 +41,10 @@ def postgres_pool(
     try:
         pool.open(wait=True)
 
-        migration: str = files("policy_pattern").joinpath(*MIGRATION_RESOURCE).read_text(encoding="utf-8")
-
         with pool.connection() as connection, connection.cursor() as cursor:
-            cursor.execute(SQL(cast(LiteralString, migration)))
+            for resource in MIGRATION_RESOURCE:
+                migration = files("policy_pattern").joinpath(*resource).read_text(encoding="utf-8")
+                cursor.execute(SQL(cast(LiteralString, migration)))
             cursor.execute('TRUNCATE TABLE "authz_tuples"')  # Ensure the table is empty before each test run
 
         yield pool
