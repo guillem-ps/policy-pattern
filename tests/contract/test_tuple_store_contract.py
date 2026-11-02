@@ -5,12 +5,8 @@ A passing suite here is what AGENTS.md calls out as the actual proof of
 substitutability; a single-adapter suite proves nothing.
 """
 
-from collections.abc import Iterator
+from pytest import mark
 
-from pytest import FixtureRequest, fixture, mark, param
-
-from policy_pattern.adapters.memory import MemoryTupleStore
-from policy_pattern.adapters.postgres import PostgresTupleStore
 from policy_pattern.models import DirectSubject, Mutation, ObjectReference, SubjectSet, Tuple
 from policy_pattern.ports import ReadResult, TupleStore
 
@@ -31,25 +27,6 @@ def _make_subject_set_tuple() -> Tuple:
     )
 
 
-@fixture(params=["memory", param("postgres", marks=mark.integration)])
-def store(request: FixtureRequest) -> Iterator[TupleStore]:
-    """
-    Parametrized fixture — every test in this module runs once per adapter.
-
-    The "postgres" parametrization carries its own `integration` marker
-    via `pytest.param(..., marks=...)`, so `pytest -m "not integration"`
-    excludes it directly — no collection hook needed. `postgres_pool` is
-    still requested lazily via `request.getfixturevalue`, not as a direct
-    fixture parameter, so the "memory" parametrization never spins up a
-    container.
-    """
-    if request.param == "postgres":
-        postgres_pool = request.getfixturevalue("postgres_pool")
-        yield PostgresTupleStore(postgres_pool)
-    else:
-        yield MemoryTupleStore()
-
-
 @mark.contract
 def test_read_after_write(store: TupleStore) -> None:
     """
@@ -60,6 +37,20 @@ def test_read_after_write(store: TupleStore) -> None:
 
     with store.snapshot() as view:
         assert view.read_tuple(tuple_.subject, tuple_.relation, tuple_.object) is True
+
+
+@mark.contract
+def test_subject_id_comparison_is_case_sensitive(store: TupleStore) -> None:
+    """
+    Test that identifiers differing only by case remain distinct.
+
+    """
+    tuple_ = _make_direct_tuple("Alice")
+    lowercase_subject = _make_direct_tuple("alice").subject
+    store.write_tuples(Mutation(additions=frozenset({tuple_}), deletions=frozenset()))
+
+    with store.snapshot() as view:
+        assert view.read_tuple(lowercase_subject, tuple_.relation, tuple_.object) is False
 
 
 @mark.contract
@@ -74,6 +65,31 @@ def test_read_after_write_with_subject_set(store: TupleStore) -> None:
         assert view.read_tuple(tuple_.subject, tuple_.relation, tuple_.object) is True
         result = view.read_relation(tuple_.object, tuple_.relation, limit=10)
     assert result.tuples == frozenset({tuple_})
+
+
+@mark.contract
+def test_read_tuples_for_subject_direct(store: TupleStore) -> None:
+    """A direct subject's tuples are found; an unrelated subject's are not."""
+    mine = _make_direct_tuple("alice")
+    other = _make_direct_tuple("bob")
+    store.write_tuples(Mutation(additions=frozenset({mine, other}), deletions=frozenset()))
+
+    with store.snapshot() as view:
+        result = view.read_tuples_for_subject(mine.subject, limit=10)
+
+    assert result == ReadResult(tuples=frozenset({mine}), complete=True)
+
+
+@mark.contract
+def test_read_tuples_for_subject_subject_set(store: TupleStore) -> None:
+    """A SubjectSet-shaped subject (group membership grant) is found the same way."""
+    tuple_ = _make_subject_set_tuple()
+    store.write_tuples(Mutation(additions=frozenset({tuple_}), deletions=frozenset()))
+
+    with store.snapshot() as view:
+        result = view.read_tuples_for_subject(tuple_.subject, limit=10)
+
+    assert result == ReadResult(tuples=frozenset({tuple_}), complete=True)
 
 
 @mark.contract

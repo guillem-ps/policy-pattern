@@ -4,6 +4,7 @@ Mother class for building test View instances.
 
 from typing import override
 
+from policy_pattern.models import Subject
 from policy_pattern.ports import ReadResult, View
 
 
@@ -24,4 +25,9 @@ class MotherView(View):
         """
         Always reports an empty, complete result.
         """
+        return ReadResult(tuples=frozenset(), complete=True)
+
+    @override
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """Always reports an empty, complete result."""
         return ReadResult(tuples=frozenset(), complete=True)

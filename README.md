@@ -20,8 +20,7 @@
     </a>
 </p>
 
-`policy-pattern` is a standalone Python library for relationship-based access control (ReBAC). It models
-authorization as relationships between subjects and objects and evaluates those relationships through composable
+`policy-pattern` is a standalone Python library for relationship-based access control (ReBAC). It models authorization as relationships between subjects and objects and evaluates those relationships through composable
 authorization rules.
 
 - **No authorization server**
@@ -106,18 +105,15 @@ evaluator = Evaluator(model=compiled, store=store)
 evaluator.check(alice, "viewer", document_42)  # True — alice owns the parent folder
 ```
 
-`viewer` here means "the document's own owner, or the owner of whatever folder it lives in" — a document under
-`folder:engineering` inherits access from that folder without copying a permission onto every document.
+`viewer` here means "the document's own owner, or the owner of whatever folder it lives in" — a document under `folder:engineering` inherits access from that folder without copying a permission onto every document.
 
-See the [Usage Guide](docs/usage/README.md) for the full, runnable walkthrough — every rewrite operator, nested
-groups, `EvaluationBudget`, and error handling.
+See the [Usage Guide](docs/usage/README.md) for the full, runnable walkthrough — every rewrite operator, nested groups, `EvaluationBudget`, and error handling.
 
 ---
 
 ## Documentation
 
-The repository uses specifications and architecture documents as part of the implementation contract — they
-describe **what must be true**, independent of any one adapter's implementation.
+The repository uses specifications and architecture documents as part of the implementation contract — they describe **what must be true**, independent of any one adapter's implementation.
 
 ```text
 docs/
@@ -128,8 +124,9 @@ docs/
 └── errors.md        — the PPxxx error code ranges and what each one means
 ```
 
-Start with the [Usage Guide](docs/usage/README.md) to see the library working end to end, then
-[Architecture](docs/architecture.md) to understand why the model is shaped the way it is.
+Start with the [Usage Guide](docs/usage/README.md) to see the library working end to end, then [Architecture](docs/architecture.md) to understand why the model is shaped the way it is.
+
+See [`CODE_STYLE.md`](.github/CODE_STYLE.md) and [`TESTING.md`](.github/TESTING.md) for contributor conventions no tool enforces.
 
 ---
 

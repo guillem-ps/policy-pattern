@@ -28,8 +28,18 @@ def test_migrated_table_matches_schema_contract(postgres_pool: ConnectionPool) -
         )
         primary_key = cursor.fetchone()
 
+        cursor.execute(
+            """SELECT array_agg(a.attname ORDER BY key.ordinality)
+               FROM pg_index idx
+               CROSS JOIN LATERAL unnest(idx.indkey) WITH ORDINALITY AS key(attnum, ordinality)
+               JOIN pg_attribute a ON a.attrelid = idx.indrelid AND a.attnum = key.attnum
+               WHERE idx.indexrelid = 'authz_tuples_subject_idx'::regclass"""
+        )
+        subject_index = cursor.fetchone()
+
     expected_names = ["object_type", "object_id", "relation", "subject_type", "subject_id", "subject_relation"]
     assert [column[0] for column in columns] == expected_names
     assert all(column[1] == "text" and column[2] for column in columns)
     assert all(column[3] == "C" for column in columns)
     assert primary_key == (expected_names,)
+    assert subject_index == (["subject_type", "subject_id", "subject_relation"],)

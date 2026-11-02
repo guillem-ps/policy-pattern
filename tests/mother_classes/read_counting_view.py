@@ -43,3 +43,9 @@ class ReadCountingView(View):
         """
         self._store.read_count += 1
         return self._inner.read_relation(object, relation, limit)
+
+    @override
+    def read_tuples_for_subject(self, subject: Subject, limit: int) -> ReadResult:
+        """Read subject tuples from the inner view and count the call."""
+        self._store.read_count += 1
+        return self._inner.read_tuples_for_subject(subject, limit)
