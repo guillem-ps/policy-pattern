@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-11-02)
+
+### Bug Fixes
+
+- **docs**: Update links to TESTING.md for consistency in documentation
+  ([`e4a419f`](https://github.com/guillem-ps/policy-pattern/commit/e4a419f03a4d30e2bc3f55f6a8550f6fc5fe7866))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`dd64a25`](https://github.com/guillem-ps/policy-pattern/commit/dd64a253529ba353789bba2c8f3832be4b0800ca))
+
+### Features
+
+- **docs**: Add comprehensive testing guidelines to TESTING.md
+  ([`f9918ba`](https://github.com/guillem-ps/policy-pattern/commit/f9918ba74c105e5eaba4141890ccd6051ce817bd))
+
+
 ## v0.5.0 (2026-11-02)
 
 ### Bug Fixes
