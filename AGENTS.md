@@ -75,7 +75,7 @@ Or the `Makefile` shortcuts: `make format`, `make lint` (`ruff check` +`ty check
 
 ## Testing Instructions
 
-See [`TESTING.md`](TESTING.md) for the full testing guide: commands by intent, what to test by kind, the mandatory TDD sequence, and the definition-of-done gate.
+See [`TESTING.md`](.github/TESTING.md) for the full testing guide: commands by intent, what to test by kind, the mandatory TDD sequence, and the definition-of-done gate.
 
 ## Code Style
 

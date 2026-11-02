@@ -126,7 +126,7 @@ docs/
 
 Start with the [Usage Guide](docs/usage/README.md) to see the library working end to end, then [Architecture](docs/architecture.md) to understand why the model is shaped the way it is.
 
-See [`CODE_STYLE.md`](.github/CODE_STYLE.md) and [`TESTING.md`](TESTING.md) for contributor conventions no tool enforces.
+See [`CODE_STYLE.md`](.github/CODE_STYLE.md) and [`TESTING.md`](.github/TESTING.md) for contributor conventions no tool enforces.
 
 ---
 
