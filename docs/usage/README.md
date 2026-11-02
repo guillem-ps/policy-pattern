@@ -242,7 +242,7 @@ candidates = frozenset({document_42, document_99, ObjectReference(type="document
 evaluator.list_objects(bob, "inherited_viewer", "document", candidate_ids=candidates)  # {document_42}
 ```
 
-`document_99` and `document:7` are excluded the same way `check_many()` excludes a denied request — `candidate_ids` only narrows the search, it never grants anything `check()` wouldn't. 
+`document_99` and `document:7` are excluded by the same `check()` filter `candidate_ids` always goes through — `candidate_ids` only narrows the search, it never grants anything `check()` wouldn't (unlike `check_many()`, which returns a decision per request and leaves the filtering to the caller, `list_objects()` does that filtering itself). 
 
 The reverse walk shares `EvaluationBudget` with the forward filter (one budget for the whole call, same rule as `check_many()`), so a subject reachable through an unusually large fan-out raises `EvaluationError` rather than silently returning a partial result.
 
