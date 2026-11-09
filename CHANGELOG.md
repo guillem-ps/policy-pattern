@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-11-09)
+
+### Bug Fixes
+
+- **docs**: Correct link to TESTING.md in CONTRIBUTING.md
+  ([`27c2c0c`](https://github.com/guillem-ps/policy-pattern/commit/27c2c0c0fb7db094d423f7bf922bc98f6b87ff92))
+
+- **docs**: Update link to TESTING.md in CONTRIBUTING.md for consistency
+  ([`bf02440`](https://github.com/guillem-ps/policy-pattern/commit/bf02440f75307fd9e6116acb009ca9e582242930))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`ad06423`](https://github.com/guillem-ps/policy-pattern/commit/ad06423f92dc37790071f1c5e0712e3ef1e4c268))
+
+### Documentation
+
+- Update docs cycle detection reference
+  ([`1cce1b0`](https://github.com/guillem-ps/policy-pattern/commit/1cce1b0bc465c9c0202fe3ca7d6eb4e8fd3b88d9))
+
+### Features
+
+- **cycles_detection**: Enhance schema validation to detect permission cycles and add corresponding
+  tests
+  ([`4d61448`](https://github.com/guillem-ps/policy-pattern/commit/4d614483c0f61a04377edc85ceed31fa5d3300f1))
+
+
 ## v0.6.0 (2026-11-02)
 
 ### Bug Fixes
