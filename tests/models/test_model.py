@@ -199,12 +199,8 @@ def test_model_compile_tupleset_must_be_relation_raises() -> None:
     """
     document = Type(
         name="document",
-        relations={},
-        permissions={
-            "editor": Reference(name="owner"),
-            "view": TupleToUserset(tupleset="editor", computed="view"),
-            "owner": Reference(name="editor"),
-        },
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"editor": Reference(name="owner"), "view": TupleToUserset(tupleset="editor", computed="view")},
     )
     model = Model(types={"document": document})
 
@@ -335,3 +331,97 @@ def test_model_compile_rejects_name_used_as_both_relation_and_permission() -> No
 
     assert exc_info.value.message == "document declares ['owner'] as both a relation and a permission"
     assert exc_info.value.related == "type='document'"
+
+
+@mark.unit
+def test_model_compile_direct_permission_cycle_raises() -> None:
+    """A permission that references itself is rejected during compilation."""
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"a": Reference(name="a")},
+    )
+
+    with raises(ModelValidationError) as exc_info:
+        Model(types={"document": document}).compile()
+
+    assert exc_info.value.message == "document.a references permission cycle to 'a'"
+
+
+@mark.unit
+def test_model_compile_two_permission_cycle_raises() -> None:
+    """A cycle spanning two permissions is rejected during compilation."""
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"a": Reference(name="b"), "b": Reference(name="a")},
+    )
+
+    with raises(ModelValidationError, match="cycle"):
+        Model(types={"document": document}).compile()
+
+
+@mark.unit
+def test_model_compile_permission_cycle_in_union_raises() -> None:
+    """A cyclic permission reference in either Union branch is rejected."""
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"a": Union(left=Reference(name="owner"), right=Reference(name="b")), "b": Reference(name="a")},
+    )
+
+    with raises(ModelValidationError, match="cycle"):
+        Model(types={"document": document}).compile()
+
+
+@mark.unit
+def test_model_compile_permission_cycle_in_exclusion_raises() -> None:
+    """A cyclic permission reference in an Exclusion operand is rejected."""
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={
+            "a": Exclusion(include=Reference(name="owner"), exclude=Reference(name="b")),
+            "b": Reference(name="a"),
+        },
+    )
+
+    with raises(ModelValidationError, match="cycle"):
+        Model(types={"document": document}).compile()
+
+
+@mark.unit
+def test_model_compile_long_acyclic_permission_chain() -> None:
+    """A long permission chain ending at a relation compiles successfully."""
+    document = Type(
+        name="document",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"a": Reference(name="b"), "b": Reference(name="c"), "c": Reference(name="owner")},
+    )
+
+    assert Model(types={"document": document}).compile().types["document"] is document
+
+
+@mark.unit
+def test_model_compile_tuple_to_userset_computed_name_is_not_static_cycle() -> None:
+    """TupleToUserset computed names are not same-object static permission edges."""
+    document = Type(
+        name="document",
+        relations={
+            "owner": Relation(allowed_subject_types=("user",)),
+            "parent": Relation(allowed_subject_types=("folder",)),
+        },
+        permissions={
+            "a": Union(
+                left=Reference(name="owner"),
+                right=TupleToUserset(tupleset="parent", computed="a"),
+            )
+        },
+    )
+    folder = Type(
+        name="folder",
+        relations={"owner": Relation(allowed_subject_types=("user",))},
+        permissions={"a": Reference(name="owner")},
+    )
+
+    assert Model(types={"document": document, "folder": folder}).compile().types["document"] is document
