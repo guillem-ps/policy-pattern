@@ -24,7 +24,8 @@ def validate_types(types: Mapping[str, Type]) -> None:
     Raises:
         ModelValidationError: If a `Type`'s key doesn't match its own `name`,
             a `Reference`/`tupleset` name doesn't exist on its own type, or a
-            `tupleset` resolves to a permission instead of a relation.
+            `tupleset` resolves to a permission instead of a relation, or a
+            permission reference closes a cycle.
 
         ModelValidationError: If a permission expression and relation share the same name on the same type,
         which is illegal.
@@ -42,7 +43,14 @@ def validate_types(types: Mapping[str, Type]) -> None:
             )
 
         for permission_name, expression in type_declaration.permissions.items():
-            _validate_expression(expression, types, type_declaration, type_name, permission_name)
+            _validate_expression(
+                expression,
+                types,
+                type_declaration,
+                type_name,
+                permission_name,
+                path=frozenset({permission_name}),
+            )
 
 
 def _validate_expression(
@@ -51,9 +59,14 @@ def _validate_expression(
     type_declaration: Type,
     type_name: str,
     permission_name: str,
+    path: frozenset[str] = frozenset(),
 ) -> None:
     """
     Recursively validates one permission expression against its own type's declarations.
+
+    Raises:
+        ModelValidationError: If a reference is undeclared or closes a permission cycle,
+            a tupleset is invalid, or the expression type is unknown.
     """
     if isinstance(expression, Reference):
         # Leaf: name must resolve within this type's own namespace.
@@ -62,6 +75,20 @@ def _validate_expression(
             raise ModelValidationError(
                 message=f"{type_name}.{permission_name} references undeclared name {expression.name!r}",
                 related=f"type={type_name!r}",
+            )
+        if expression.name in type_declaration.permissions:
+            if expression.name in path:
+                raise ModelValidationError(
+                    message=f"{type_name}.{permission_name} references permission cycle to {expression.name!r}",
+                    related=f"type={type_name!r}",
+                )
+            _validate_expression(
+                type_declaration.permissions[expression.name],
+                types,
+                type_declaration,
+                type_name,
+                expression.name,
+                path=path | {expression.name},
             )
     elif isinstance(expression, TupleToUserset):
         # Leaf: tupleset must be a stored edge — nothing to traverse if it were computed.
@@ -73,16 +100,50 @@ def _validate_expression(
                 ),
                 related=f"type={type_name!r}",
             )
-        _validate_tuple_to_userset_targets(expression, types, type_declaration, type_name, permission_name)
+        _validate_tuple_to_userset_targets(
+            expression=expression,
+            types=types,
+            type_declaration=type_declaration,
+            type_name=type_name,
+            permission_name=permission_name,
+        )
     elif isinstance(expression, (Union, Intersection)):
         # Rewrite combinator: set-algebra, commutative — validate both operands, order doesn't matter.
-        _validate_expression(expression.left, types, type_declaration, type_name, permission_name)
-        _validate_expression(expression.right, types, type_declaration, type_name, permission_name)
+        _validate_expression(
+            expression=expression.left,
+            types=types,
+            type_declaration=type_declaration,
+            type_name=type_name,
+            permission_name=permission_name,
+            path=path,
+        )
+        _validate_expression(
+            expression=expression.right,
+            types=types,
+            type_declaration=type_declaration,
+            type_name=type_name,
+            permission_name=permission_name,
+            path=path,
+        )
     elif isinstance(expression, Exclusion):
         # Rewrite combinator, not commutative — include/exclude both required; skipping one is the
         # classic false-allow bug (an accidental swap would silently invert the exclusion).
-        _validate_expression(expression.include, types, type_declaration, type_name, permission_name)
-        _validate_expression(expression.exclude, types, type_declaration, type_name, permission_name)
+        _validate_expression(
+            expression=expression.include,
+            types=types,
+            type_declaration=type_declaration,
+            type_name=type_name,
+            permission_name=permission_name,
+            path=path,
+        )
+        _validate_expression(
+            expression=expression.exclude,
+            types=types,
+            type_declaration=type_declaration,
+            type_name=type_name,
+            permission_name=permission_name,
+            path=path,
+        )
     else:
         raise ModelValidationError(
             message=f"{type_name}.{permission_name} contains unknown expression type {type(expression).__name__!r}",

@@ -814,20 +814,40 @@ def test_exclusion_propagates_error_from_exclude_side() -> None:
         types={
             "document": Type(
                 name="document",
-                relations={"owner": Relation(allowed_subject_types=("user",))},
+                relations={
+                    "owner": Relation(allowed_subject_types=("user",)),
+                    "parent": Relation(allowed_subject_types=("folder",)),
+                },
                 permissions={
-                    "cyclic": Reference(name="cyclic_alias"),
-                    "cyclic_alias": Reference(name="cyclic"),
+                    "cyclic": TupleToUserset(tupleset="parent", computed="cyclic"),
                     "restricted": Exclusion(include=Reference(name="owner"), exclude=Reference(name="cyclic")),
                 },
+            ),
+            "folder": Type(
+                name="folder",
+                relations={"parent": Relation(allowed_subject_types=("document",))},
+                permissions={"cyclic": TupleToUserset(tupleset="parent", computed="cyclic")},
             ),
         }
     )
     store = MemoryTupleStore()
+    document = _document("42")
+    folder = ObjectReference(type="folder", id="shared")
+    store.write_tuples(
+        Mutation(
+            additions=frozenset(
+                {
+                    Tuple(subject=DirectSubject(object=folder), relation="parent", object=document),
+                    Tuple(subject=DirectSubject(object=document), relation="parent", object=folder),
+                }
+            ),
+            deletions=frozenset(),
+        )
+    )
     evaluator = Evaluator(model=model, store=store)
 
     with raises(EvaluationError):
-        evaluator.check(_direct("alice"), "restricted", _document("42"))
+        evaluator.check(_direct("alice"), "restricted", document)
 
 
 @mark.unit

@@ -193,18 +193,10 @@ class Evaluator:
 - `ModelValidationError` (`PP101`, `compile()`-time only) — raised by
   `Model.compile()` for an undeclared `Reference`/`tupleset` name, a
   `tupleset` resolving to a `Permission` instead of a `Relation`, a
-  `TupleToUserset.computed` that doesn't resolve to a relation or
-  permission on every plain-type target the tupleset relation's
-  `allowed_subject_types` allows, or the exhaustiveness fallback for an
-  unrecognized expression type.
+  `TupleToUserset.computed` that doesn't resolve to a relation or permission on every plain-type target the tupleset relation's `allowed_subject_types` allows, a cycle among permission references on the same type, or the exhaustiveness fallback for an unrecognized expression type.
 - `EvaluationError` (`PP201`, runtime: budget exceeded, cycle detected).
 - `IndexEntryTooLargeError` (`PP900`) — raised by `PostgresTupleStore.write_tuples()`,
-  before acquiring any connection, when an addition's encoded primary key
-  would exceed PostgreSQL's B-tree index entry limit. `Identifier` bounds a
-  value by code points (255 max, any printable Unicode), not encoded
-  bytes, so a value valid by `Identifier`'s own contract can still be too
-  large for this adapter's composite key once UTF-8-encoded. First use of
-  the `PP9xx` (storage/adapter) range.
+  before acquiring any connection, when an addition's encoded primary key would exceed PostgreSQL's B-tree index entry limit. `Identifier` bounds a value by code points (255 max, any printable Unicode), not encoded bytes, so a value valid by `Identifier`'s own contract can still be too large for this adapter's composite key once UTF-8-encoded. First use of the `PP9xx` (storage/adapter) range.
 
 No shared `StorageError` base: the contract is "adapters raise their own
 errors, always propagated, never swallowed" (`semantics.md`) — not
@@ -275,22 +267,16 @@ unvalidated model is an illegal state, unrepresentable by the type.
 
 - every `Reference`/`tupleset` name exists on the type
 - every `tupleset` resolves to a `Relation`, never a `Permission`
+- permission-reference cycles within a type are rejected
 
-Schema-level cycle detection is not part of `compile()` in v1 — see below
-for why that's still safe.
+## Compile-time and runtime cycle detection
 
-## Cycles are caught at runtime, uniformly
-
-A single guard — `visited`, keyed by `(subject, object, name)`, inside
-`EvaluationContext` — catches every cycle, whether it originates from real
-data (`folder:A#parent@folder:B` / `folder:B#parent@folder:A` via
-`TupleToUserset`, crossing object *instances*) or from a same-object
-self-reference with no traversal involved at all. Re-entering a
-`(subject, object, name)` triple already being evaluated within one
-`check()`/`check_many()` request raises `EvaluationError`. There is no separate compile-time schema-cycle
-guard: it would only change *when* the error surfaces, never add safety
-`visited` doesn't already provide, since neither path can produce a false
-allow.
+`compile()` rejects cycles formed by `Reference`s between permissions on
+the same type. Cycles that depend on tuple data, such as a `TupleToUserset`
+traversal between objects, are detected at runtime. The evaluator's guard
+in `EvaluationContext`, keyed by `(subject, object, name)`, raises
+`EvaluationError` when a triple is revisited within one
+`check()`/`check_many()` request.
 
 ## Evaluator behavior
 
@@ -380,11 +366,11 @@ Services whose authorization relationships already exist in their business table
 ## Scope
 
 ```
-v1:    Model (Relation/Permission) + compile() + reference validation
+v1:    Model (Relation/Permission) + compile() + reference and
+       permission-cycle validation
        + Runtime: check(), EvaluationBudget (depth + nodes + reads),
        deterministic evaluation order, uniform runtime cycle guard
-v1.x:  compile()-time schema-cycle detection (better error message, not a
-       safety requirement), explain() with an explicit trust boundary,
+v1.x:  explain() with an explicit trust boundary,
        Evaluator.check_many() (batch checks — formerly unscheduled,
        confirmed in scope, built, see below), Evaluator.list_objects(),
        an invariants API over an explicit fixture set, unused/complexity
