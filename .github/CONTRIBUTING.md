@@ -18,7 +18,7 @@ Security vulnerabilities should be reported according to [`SECURITY.md`](../SECU
 
 ## Testing strategy
 
-See [`TESTING.md`](.github/TESTING.md) for the full testing guide. Run locally with `make test` (or `make
+See [`TESTING.md`](TESTING.md) for the full testing guide. Run locally with `make test` (or `make
 coverage` for a coverage report) — see the [Makefile](../Makefile) for every available target.
 
 ## Pull requests
