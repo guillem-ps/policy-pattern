@@ -4,7 +4,7 @@ Contributions are welcome once the initial semantic model and public interfaces 
 significant churn — check [`docs/architecture.md`](../docs/architecture.md) § Scope before proposing a feature that
 might already be planned or explicitly out of scope.
 
-Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Participation in this project is governed by the [Code of Conduct](https://github.com/guillem-ps/policy-pattern/blob/master/.github/CODE_OF_CONDUCT.md).
 
 Because this library participates in authorization decisions, changes affecting semantics or security should
 include:
@@ -18,7 +18,7 @@ Security vulnerabilities should be reported according to [`SECURITY.md`](../SECU
 
 ## Testing strategy
 
-See [`TESTING.md`](TESTING.md) for the full testing guide. Run locally with `make test` (or `make
+See [`TESTING.md`](https://github.com/guillem-ps/policy-pattern/blob/master/.github/TESTING.md) for the full testing guide. Run locally with `make test` (or `make
 coverage` for a coverage report) — see the [Makefile](../Makefile) for every available target.
 
 ## Pull requests
