@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v0.7.1 (2026-11-16)
+
+### Bug Fixes
+
+- **docs**: Update links to Code of Conduct in CONTRIBUTING.md and PULL_REQUEST_TEMPLATE.md for
+  consistency
+  ([`c77dbb7`](https://github.com/guillem-ps/policy-pattern/commit/c77dbb7a07c8d1fd6444e6ec54074d99a920539b))
+
+### Chores
+
+- Sync uv.lock and CITATION.cff date with released version
+  ([`25032b2`](https://github.com/guillem-ps/policy-pattern/commit/25032b26cf50333dfee84d570d34c15351f8251b))
+
+### Features
+
+- Add release-bump label detection to release workflow
+  ([`89d0742`](https://github.com/guillem-ps/policy-pattern/commit/89d0742c76739f8a1ddaa35fb232597190e30b99))
+
+- Improve release-bump label detection by handling labels as an array
+  ([`fc6ee08`](https://github.com/guillem-ps/policy-pattern/commit/fc6ee0820db4f083d66a905956a121a1eb21c2f7))
+
+
 ## v0.7.0 (2026-11-09)
 
 ### Bug Fixes
